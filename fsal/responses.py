@@ -1,9 +1,23 @@
-from commandtypes import COMMAND_TYPE_LIST_DIR
+# -*- coding: utf-8 -*-
+
+"""
+responses.py: response builders for FSAL
+
+Copyright 2014-2015, Outernet Inc.
+Some rights reserved.
+
+This software is free software licensed under the terms of GPLv3. See COPYING
+file that comes with the source code, or http://www.gnu.org/licenses/gpl.txt.
+"""
 
 from xml.etree.ElementTree import Element, SubElement, tostring
 
+from commandtypes import COMMAND_TYPE_LIST_DIR
+
+
 def create_response_xml_root():
     return Element('response')
+
 
 class DirectoryListingResponse:
     def __init__(self, response_data):
@@ -30,12 +44,13 @@ class DirectoryListingResponse:
     def get_xml_str(self):
         return tostring(self.get_xml())
 
+
 class CommandResponseFactory:
-    response_map = { COMMAND_TYPE_LIST_DIR:DirectoryListingResponse }
+    response_map = {COMMAND_TYPE_LIST_DIR: DirectoryListingResponse}
 
     def create_response(self, response_data):
         command_type = response_data['type']
-        if not command_type in self.response_map:
+        if command_type not in self.response_map:
             return None
         else:
             return self.response_map[command_type](response_data)
