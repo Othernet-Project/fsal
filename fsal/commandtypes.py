@@ -1,0 +1,2 @@
+COMMAND_TYPE_LIST_DIR = 'list_dir'
+COMMAND_TYPE_COPY = 'copy'
