@@ -13,6 +13,8 @@ file that comes with the source code, or http://www.gnu.org/licenses/gpl.txt.
 import os
 import shutil
 
+import scandir
+
 from commandtypes import COMMAND_TYPE_LIST_DIR, COMMAND_TYPE_COPY
 
 
@@ -40,12 +42,11 @@ class DirectoryListingCommandHandler(CommandHandler):
         file_paths = []
         if os.path.exists(path):
             success = True
-            for name in os.listdir(path):
-                absolute_path = os.path.join(path, name)
-                if os.path.isdir(absolute_path):
-                    dir_paths.append(absolute_path)
+            for entry in scandir.scandir(path):
+                if entry.is_dir():
+                    dir_paths.append(entry.path)
                 else:
-                    file_paths.append(absolute_path)
+                    file_paths.append(entry.path)
 
         result = super(DirectoryListingCommandHandler, self).do_command()
         result['sucess'] = success
