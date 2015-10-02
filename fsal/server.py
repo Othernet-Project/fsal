@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-fsal.py: main FSAL module
+server.py: FSAL server module
 
 Copyright 2014-2015, Outernet Inc.
 Some rights reserved.
@@ -62,6 +62,8 @@ def read_request(sock, buff_size=2048):
 def send_response(sock, response_data):
     response = response_factory.create_response(response_data)
     response_str = response.get_xml_str().encode(OUT_ENCODING)
+    if not response_str[-1] == '\0':
+        response_str += '\0'
     sock.sendall(response_str)
 
 

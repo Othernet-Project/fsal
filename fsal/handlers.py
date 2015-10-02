@@ -15,6 +15,7 @@ import shutil
 
 import scandir
 
+from common import File, Directory
 from commandtypes import COMMAND_TYPE_LIST_DIR, COMMAND_TYPE_COPY
 
 
@@ -38,19 +39,19 @@ class DirectoryListingCommandHandler(CommandHandler):
     def do_command(self):
         path = self.command_data['params']['path']
         success = False
-        dir_paths = []
-        file_paths = []
+        dirs = []
+        files = []
         if os.path.exists(path):
             success = True
             for entry in scandir.scandir(path):
                 if entry.is_dir():
-                    dir_paths.append(entry.path)
+                    dirs.append(Directory.from_path(entry.path))
                 else:
-                    file_paths.append(entry.path)
+                    files.append(File.from_path(entry.path))
 
         result = super(DirectoryListingCommandHandler, self).do_command()
-        result['sucess'] = success
-        result['params'] = {'dirs': dir_paths, 'files': file_paths}
+        result['success'] = success
+        result['params'] = {'dirs': dirs, 'files': files}
         return result
 
 
