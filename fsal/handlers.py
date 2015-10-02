@@ -10,12 +10,14 @@ This software is free software licensed under the terms of GPLv3. See COPYING
 file that comes with the source code, or http://www.gnu.org/licenses/gpl.txt.
 """
 
+from __future__ import absolute_import
+
 import os
 import shutil
 
 import scandir
 
-from common import File, Directory
+from fs import File, Directory
 from commandtypes import COMMAND_TYPE_LIST_DIR, COMMAND_TYPE_COPY
 
 

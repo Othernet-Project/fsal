@@ -31,8 +31,8 @@ OUT_ENCODING = 'utf-8'
 
 SOCKET_PATH = './fsal_socket'
 
-handler_factory = None
-response_factory = None
+handler_factory = CommandHandlerFactory()
+response_factory = CommandResponseFactory()
 
 
 def consume_command_queue(command_queue):
@@ -95,10 +95,6 @@ def open_socket():
 
 def main():
     with open_socket() as sock:
-        global handler_factory
-        handler_factory = CommandHandlerFactory()
-        global response_factory
-        response_factory = CommandResponseFactory()
         server = StreamServer(sock, request_handler)
         server.serve_forever()
 
