@@ -2,11 +2,11 @@ import os
 
 from datetime import datetime
 
-class File(object):
 
-    def __init__(self, name, size, create_date, modify_date):
+class FSObject(object):
+
+    def __init__(self, name, create_date, modify_date):
         self._name = name
-        self._size= size
         self._create_date = create_date
         self._modify_date = modify_date
 
@@ -15,16 +15,23 @@ class File(object):
         return self._name
 
     @property
-    def size(self):
-        return self._size
-
-    @property
     def create_date(self):
         return self._create_date
 
     @property
     def modify_date(self):
         return self._modify_date
+
+
+class File(FSObject):
+
+    def __init__(self, name, size, create_date, modify_date):
+        super(File, self).__init__(name, create_date, modify_date)
+        self._size = size
+
+    @property
+    def size(self):
+        return self._size
 
     @classmethod
     def from_xml(cls, file_xml):
@@ -47,24 +54,7 @@ class File(object):
                    modify_date=modify_date)
 
 
-class Directory(object):
-
-    def __init__(self, name, create_date, modify_date):
-        self._name = name
-        self._create_date = create_date
-        self._modify_date = modify_date
-
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def create_date(self):
-        return self._create_date
-
-    @property
-    def modify_date(self):
-        return self._modify_date
+class Directory(FSObject):
 
     @classmethod
     def from_xml(cls, file_xml):
@@ -83,5 +73,3 @@ class Directory(object):
         modify_date = datetime.fromtimestamp(os.path.getmtime(file_path))
         return cls(name=name, create_date=create_date,
                    modify_date=modify_date)
-
-
