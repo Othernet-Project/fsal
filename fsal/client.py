@@ -45,7 +45,6 @@ class FSAL(object):
         params = {'path': path}
         request_xml = build_request_xml(COMMAND_TYPE_LIST_DIR, params)
         response = self._send_request(tostring(request_xml))
-        print(response)
         response_xml = ET.fromstring(response)
         return self._parse_list_dir_response(response_xml)
 
