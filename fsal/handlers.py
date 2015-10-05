@@ -26,8 +26,9 @@ class CommandHandler(object):
 
     is_synchronous = True
 
-    def __init__(self, command_data):
+    def __init__(self, command_data, config):
         self.command_data = command_data
+        self.config = config
 
     def do_command(self):
         result = dict()
@@ -40,9 +41,13 @@ class DirectoryListingCommandHandler(CommandHandler):
 
     def do_command(self):
         path = self.command_data['params']['path']
+        if(path[0] == '/'):
+            path = path[1:]
         success = False
         dirs = []
         files = []
+        base_path = self.config['fsal.basepath']
+        path = os.path.join(base_path, path)
         if os.path.exists(path):
             success = True
             for entry in scandir.scandir(path):
@@ -80,9 +85,9 @@ class CommandHandlerFactory(object):
         COMMAND_TYPE_COPY: CopyCommandHandler
     }
 
-    def create_handler(self, command_data):
+    def create_handler(self, command_data, config):
         command_type = command_data['type']
         if command_type not in self.handler_map:
             return None
         else:
-            return self.handler_map[command_type](command_data)
+            return self.handler_map[command_type](command_data, config)
