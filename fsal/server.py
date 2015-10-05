@@ -33,8 +33,6 @@ from responses import CommandResponseFactory
 IN_ENCODING = 'ascii'
 OUT_ENCODING = 'utf-8'
 
-SOCKET_PATH = './fsal_socket'
-
 MODDIR = dirname(abspath(__file__))
 
 handler_factory = CommandHandlerFactory()
@@ -81,27 +79,6 @@ def parse_request(request_str):
     return ET.fromstring(request_str)
 
 
-def prepare_socket(path):
-    try:
-        os.unlink(path)
-    except OSError:
-        if(os.path.exists(path)):
-            raise
-    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    sock.bind(path)
-    sock.listen(1)
-    return sock
-
-
-@contextmanager
-def open_socket():
-    sock = prepare_socket(SOCKET_PATH)
-    try:
-        yield sock
-    finally:
-        sock.shutdown(socket.SHUT_RDWR)
-        sock.close()
-
 
 def get_config_path():
     default_path = in_pkg('fsal-server.ini')
@@ -114,7 +91,7 @@ class FSALServer(object):
         self._config = config
 
     def run(self):
-        with open_socket() as sock:
+        with self.open_socket() as sock:
             server = StreamServer(sock, self._request_handler)
             server.serve_forever()
 
@@ -124,6 +101,27 @@ class FSALServer(object):
         handler = handler_factory.create_handler(command_data, self._config)
         if handler.is_synchronous:
             send_response(sock, handler.do_command())
+
+    def prepare_socket(self, path):
+        try:
+            os.unlink(path)
+        except OSError:
+            if(os.path.exists(path)):
+                raise
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.bind(path)
+        sock.listen(1)
+        return sock
+
+
+    @contextmanager
+    def open_socket(self):
+        sock = self.prepare_socket(self._config['fsal.socket'])
+        try:
+            yield sock
+        finally:
+            sock.shutdown(socket.SHUT_RDWR)
+            sock.close()
 
 
 def main():
