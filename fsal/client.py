@@ -63,13 +63,13 @@ class FSAL(object):
         dirs = []
         files = []
         if success:
+            base_path = response_xml.find('.//base-path').text
             dirs_node = response_xml.find('.//dirs')
             for child in dirs_node:
-                dirs.append(Directory.from_xml(child))
+                dirs.append(Directory.from_xml(base_path, child))
 
             files_node = response_xml.find('.//files')
             for child in files_node:
-                files.append(File.from_xml(child))
+                files.append(File.from_xml(base_path, child))
 
         return (dirs, files)
-

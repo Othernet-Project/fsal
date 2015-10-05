@@ -5,10 +5,20 @@ from datetime import datetime
 
 class FSObject(object):
 
-    def __init__(self, name, create_date, modify_date):
-        self._name = name
+    def __init__(self, base_path, rel_path, create_date, modify_date):
+        self._rel_path = rel_path
+        self._path = os.path.join(base_path, rel_path)
+        self._name = os.path.split(rel_path)[1]
         self._create_date = create_date
         self._modify_date = modify_date
+
+    @property
+    def path(self):
+        return self._path
+
+    @property
+    def rel_path(self):
+        return self._rel_path
 
     @property
     def name(self):
@@ -25,8 +35,8 @@ class FSObject(object):
 
 class File(FSObject):
 
-    def __init__(self, name, size, create_date, modify_date):
-        super(File, self).__init__(name, create_date, modify_date)
+    def __init__(self, base_path, rel_path, size, create_date, modify_date):
+        super(File, self).__init__(base_path, rel_path, create_date, modify_date)
         self._size = size
 
     @property
@@ -34,42 +44,42 @@ class File(FSObject):
         return self._size
 
     @classmethod
-    def from_xml(cls, file_xml):
-        name = file_xml.find('name').text
+    def from_xml(cls, base_path, file_xml):
+        rel_path = file_xml.find('rel-path').text
         size = file_xml.find('size').text
         create_timestamp = file_xml.find('create-timestamp').text
         create_date = datetime.fromtimestamp(float(create_timestamp))
         modify_timestamp = file_xml.find('modify-timestamp').text
         modify_date = datetime.fromtimestamp(float(modify_timestamp))
-        return cls(name=name, size=size, create_date=create_date,
-                   modify_date=modify_date)
+        return cls(base_path=base_path, rel_path=rel_path, size=size,
+                   create_date=create_date, modify_date=modify_date)
 
     @classmethod
-    def from_path(cls, file_path):
-        head, name = os.path.split(file_path)
-        size = os.path.getsize(file_path)
-        create_date = datetime.fromtimestamp(os.path.getctime(file_path))
-        modify_date = datetime.fromtimestamp(os.path.getmtime(file_path))
-        return cls(name=name, size=size, create_date=create_date,
-                   modify_date=modify_date)
+    def from_path(cls, base_path, rel_path):
+        full_path = os.path.join(base_path, rel_path)
+        size = os.path.getsize(full_path)
+        create_date = datetime.fromtimestamp(os.path.getctime(full_path))
+        modify_date = datetime.fromtimestamp(os.path.getmtime(full_path))
+        return cls(base_path=base_path, rel_path=rel_path, size=size,
+                   create_date=create_date, modify_date=modify_date)
 
 
 class Directory(FSObject):
 
     @classmethod
-    def from_xml(cls, file_xml):
-        name = file_xml.find('name').text
+    def from_xml(cls, base_path, file_xml):
+        rel_path = file_xml.find('rel-path').text
         create_timestamp = file_xml.find('create-timestamp').text
         create_date = datetime.fromtimestamp(float(create_timestamp))
         modify_timestamp = file_xml.find('modify-timestamp').text
         modify_date = datetime.fromtimestamp(float(modify_timestamp))
-        return cls(name=name, create_date=create_date,
+        return cls(base_path=base_path, rel_path=rel_path, create_date=create_date,
                    modify_date=modify_date)
 
     @classmethod
-    def from_path(cls, file_path):
-        head, name = os.path.split(file_path)
-        create_date = datetime.fromtimestamp(os.path.getctime(file_path))
-        modify_date = datetime.fromtimestamp(os.path.getmtime(file_path))
-        return cls(name=name, create_date=create_date,
-                   modify_date=modify_date)
+    def from_path(cls, base_path, rel_path):
+        full_path = os.path.join(base_path, rel_path)
+        create_date = datetime.fromtimestamp(os.path.getctime(full_path))
+        modify_date = datetime.fromtimestamp(os.path.getmtime(full_path))
+        return cls(base_path=base_path, rel_path=rel_path,
+                   create_date=create_date, modify_date=modify_date)

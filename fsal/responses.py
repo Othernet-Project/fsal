@@ -39,11 +39,14 @@ class DirectoryListingResponse:
         success_node.text = str(self.response_data['success']).lower()
         params_node = SubElement(result_node, 'params')
 
+        base_path_node = SubElement(params_node, 'base-path')
+        base_path_node.text = self.response_data['params']['base_path']
+
         dirs_node = SubElement(params_node, 'dirs')
         for d in self.response_data['params']['dirs']:
             dir_node = SubElement(dirs_node, 'dir')
-            name_node = SubElement(dir_node, 'name')
-            name_node.text = d.name
+            rel_path_node = SubElement(dir_node, 'rel-path')
+            rel_path_node.text = d.rel_path
             create_timestamp_node = SubElement(dir_node, 'create-timestamp')
             create_timestamp_node.text = str(to_timestamp(d.create_date))
             modify_timestamp_node = SubElement(dir_node, 'modify-timestamp')
@@ -52,8 +55,8 @@ class DirectoryListingResponse:
         files_node = SubElement(params_node, 'files')
         for f in self.response_data['params']['files']:
             file_node = SubElement(files_node, 'file')
-            name_node = SubElement(file_node, 'name')
-            name_node.text = f.name
+            rel_path_node = SubElement(file_node, 'rel-path')
+            rel_path_node.text = f.rel_path
             size_node = SubElement(file_node, 'size')
             size_node.text = str(f.size)
             create_timestamp_node = SubElement(file_node, 'create-timestamp')

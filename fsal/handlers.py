@@ -47,18 +47,20 @@ class DirectoryListingCommandHandler(CommandHandler):
         dirs = []
         files = []
         base_path = self.config['fsal.basepath']
-        path = os.path.join(base_path, path)
-        if os.path.exists(path):
+        full_path = os.path.join(base_path, path)
+        if os.path.exists(full_path):
             success = True
-            for entry in scandir.scandir(path):
+            for entry in scandir.scandir(full_path):
+                rel_path = os.path.relpath(entry.path, base_path)
                 if entry.is_dir():
-                    dirs.append(Directory.from_path(entry.path))
+                    dirs.append(Directory.from_path(base_path, rel_path))
                 else:
-                    files.append(File.from_path(entry.path))
+                    files.append(File.from_path(base_path, rel_path))
 
         result = super(DirectoryListingCommandHandler, self).do_command()
         result['success'] = success
-        result['params'] = {'dirs': dirs, 'files': files}
+        result['params'] = {'base_path': base_path, 'dirs': dirs,
+                            'files': files}
         return result
 
 
