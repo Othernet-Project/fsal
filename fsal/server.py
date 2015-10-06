@@ -19,6 +19,7 @@ import os
 import re
 import sys
 import socket
+import signal
 from contextlib import contextmanager
 from os.path import join, dirname, abspath, normpath
 
@@ -125,8 +126,13 @@ def main():
 
     config_path = args.conf
     config = ConfDict.from_file(config_path, catchall=True, autojson=True)
+
+    server = FSALServer(config)
+
+    signal.signal(signal.SIGINT, lambda *a, **k: server.stop())
+    signal.signal(signal.SIGTERM, lambda *a, **k: server.stop())
+
     try:
-        server = FSALServer(config)
         server.run()
     except KeyboardInterrupt:
         print('Keyboard interrupt received')
