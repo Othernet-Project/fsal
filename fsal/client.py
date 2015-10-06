@@ -6,8 +6,8 @@ import socket
 import xml.etree.ElementTree as ET
 from xml.etree.ElementTree import Element, SubElement, tostring
 
+from . import commandtypes
 from .fs import File, Directory
-from .commandtypes import COMMAND_TYPE_LIST_DIR
 
 IN_ENCODING = 'utf-8'
 OUT_ENCODING = 'utf-8'
@@ -55,13 +55,6 @@ class FSAL(object):
     def __init__(self, socket_path):
         self.socket_path = socket_path
 
-    def list_dir(self, path):
-        params = {'path': path}
-        request_xml = build_request_xml(COMMAND_TYPE_LIST_DIR, params)
-        response = self._send_request(tostring(request_xml))
-        response_xml = ET.fromstring(response)
-        return self._parse_list_dir_response(response_xml)
-
     def _send_request(self, message):
         if not message[-1] == '\0':
             message = message.encode(OUT_ENCODING) + '\0'
@@ -70,8 +63,7 @@ class FSAL(object):
         sock.sendall(message)
         return read_socket_stream(sock)
 
-    @staticmethod
-    def _parse_list_dir_response(response_xml):
+    def _parse_list_dir_response(self, response_xml):
         success_node = response_xml.find('.//success')
         success = str_to_bool(success_node.text)
         dirs = []
@@ -87,3 +79,18 @@ class FSAL(object):
                 files.append(File.from_xml(base_path, child))
 
         return (dirs, files)
+
+    def _parse_exists_response(self, response_xml):
+        success_node = response_xml.find('.//success')
+        success = str_to_bool(success_node.text)
+        exists_node = response_xml.find('.//exists')
+        exists = str_to_bool(exists_node.text)
+        return success and exists
+
+    @command(commandtypes.COMMAND_TYPE_LIST_DIR, _parse_list_dir_response)
+    def list_dir(self, path):
+        return {'path': path}
+
+    @command(commandtypes.COMMAND_TYPE_EXISTS, _parse_exists_response)
+    def exists(self, path):
+        return {'path': path}
