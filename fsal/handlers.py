@@ -93,7 +93,7 @@ class ExistsCommandHandler(CommandHandler):
         return self.send_result(success=True, params=params)
 
 
-class IsdirCommandHandler(CommandHandler):
+class IsDirCommandHandler(CommandHandler):
     command_type = commandtypes.COMMAND_TYPE_ISDIR
 
     def do_command(self):
@@ -102,6 +102,18 @@ class IsdirCommandHandler(CommandHandler):
         full_path = os.path.join(base_path, path)
         isdir = os.path.isdir(full_path)
         params = {'base_path': base_path, 'isdir': isdir}
+        return self.send_result(success=True, params=params)
+
+
+class IsFileCommandHandler(CommandHandler):
+    command_type = commandtypes.COMMAND_TYPE_ISFILE
+
+    def do_command(self):
+        path = self.command_data['params']['path']
+        base_path = self.config['fsal.basepath']
+        full_path = os.path.join(base_path, path)
+        isfile = os.path.isfile(full_path)
+        params = {'base_path': base_path, 'isfile': isfile}
         return self.send_result(success=True, params=params)
 
 
