@@ -76,11 +76,16 @@ class FSALServer(object):
 
     def __init__(self, config):
         self._config = config
+        self._server = None
 
     def run(self):
         with self.open_socket() as sock:
-            server = StreamServer(sock, self._request_handler)
-            server.serve_forever()
+            self._server = StreamServer(sock, self._request_handler)
+            self._server.serve_forever()
+
+    def stop(self):
+        if self._server and self._server.started:
+            self._server.stop()
 
     def _request_handler(self, sock, address):
         request_data = xmltodict.parse(read_request(sock))['request']
@@ -106,7 +111,6 @@ class FSALServer(object):
         try:
             yield sock
         finally:
-            sock.shutdown(socket.SHUT_RDWR)
             sock.close()
 
 
@@ -116,13 +120,17 @@ def main():
     parser = argparse.ArgumentParser(description='Start FSAL server')
     parser.add_argument('--conf', metavar='PATH',
                         help='Path to configuration file',
-                        default=in_pkg('fsal-server.conf'))
+                        default=in_pkg('fsal-server.ini'))
     args = parser.parse_args()
 
     config_path = args.conf
     config = ConfDict.from_file(config_path, catchall=True, autojson=True)
-    server = FSALServer(config)
-    server.run()
+    try:
+        server = FSALServer(config)
+        server.run()
+    except KeyboardInterrupt:
+        print('Keyboard interrupt received')
+    server.stop()
 
 if __name__ == '__main__':
     main()
