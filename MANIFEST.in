@@ -1,0 +1,3 @@
+include README.in
+include conf/requirements.txt
+recursive-include fsal *.ini
