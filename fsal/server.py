@@ -26,9 +26,9 @@ import xmltodict
 import xml.etree.ElementTree as ET
 from gevent.server import StreamServer
 
-from confloader import ConfDict
-from handlers import CommandHandlerFactory
-from responses import CommandResponseFactory
+from .confloader import ConfDict
+from .handlers import CommandHandlerFactory
+from .responses import CommandResponseFactory
 
 IN_ENCODING = 'ascii'
 OUT_ENCODING = 'utf-8'

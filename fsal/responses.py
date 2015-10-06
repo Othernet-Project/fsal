@@ -14,7 +14,7 @@ from datetime import datetime
 
 from xml.etree.ElementTree import Element, SubElement, tostring
 
-from commandtypes import COMMAND_TYPE_LIST_DIR
+from .commandtypes import COMMAND_TYPE_LIST_DIR
 
 
 def create_response_xml_root():

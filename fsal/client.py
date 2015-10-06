@@ -5,8 +5,8 @@ import socket
 import xml.etree.ElementTree as ET
 from xml.etree.ElementTree import Element, SubElement, tostring
 
-from fs import File, Directory
-from commandtypes import COMMAND_TYPE_LIST_DIR
+from .fs import File, Directory
+from .commandtypes import COMMAND_TYPE_LIST_DIR
 
 IN_ENCODING = 'utf-8'
 OUT_ENCODING = 'utf-8'

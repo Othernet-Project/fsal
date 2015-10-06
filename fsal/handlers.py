@@ -17,8 +17,8 @@ import shutil
 
 import scandir
 
-from fs import File, Directory
-from commandtypes import COMMAND_TYPE_LIST_DIR, COMMAND_TYPE_COPY
+from .fs import File, Directory
+from .commandtypes import COMMAND_TYPE_LIST_DIR, COMMAND_TYPE_COPY
 
 
 class CommandHandler(object):
