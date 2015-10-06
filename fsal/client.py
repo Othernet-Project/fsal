@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+import functools
 import socket
 
 import xml.etree.ElementTree as ET
@@ -34,6 +35,19 @@ def read_socket_stream(sock, buff_size=2048):
 
 def str_to_bool(s):
     return str(s).lower() == "true"
+
+
+def command(command_type, response_parser):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            params = func(self, *args, **kwargs)
+            request_xml = build_request_xml(command_type, params)
+            response = self._send_request(tostring(request_xml))
+            response_xml = ET.fromstring(response)
+            return response_parser(self, response_xml)
+        return wrapper
+    return decorator
 
 
 class FSAL(object):
