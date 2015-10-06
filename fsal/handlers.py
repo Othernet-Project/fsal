@@ -94,15 +94,17 @@ class ExistsCommandHandler(CommandHandler):
 
 
 class CommandHandlerFactory(object):
-    handler_map = {
-        commandtypes.COMMAND_TYPE_LIST_DIR: DirectoryListingCommandHandler,
-        commandtypes.COMMAND_TYPE_COPY: CopyCommandHandler,
-        commandtypes.COMMAND_TYPE_EXISTS: ExistsCommandHandler,
-    }
+
+    def __init__(self):
+        all_handlers = CommandHandler.__subclasses__()
+        self.handler_map = dict((handler_cls.command_type, handler_cls)
+                                for handler_cls in all_handlers)
 
     def create_handler(self, command_data, config):
         command_type = command_data['type']
-        if command_type not in self.handler_map:
+        try:
+            handler_cls = self.handler_map[command_type]
+        except KeyError:
             return None
         else:
-            return self.handler_map[command_type](command_data, config)
+            return handler_cls(command_data, config)
