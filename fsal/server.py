@@ -100,7 +100,6 @@ class FSALServer(object):
         sock.listen(1)
         return sock
 
-
     @contextmanager
     def open_socket(self):
         sock = self.prepare_socket(self._config['fsal.socket'])
