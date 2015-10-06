@@ -101,6 +101,13 @@ class FSAL(object):
         isfile = str_to_bool(isfile_node.text)
         return success and isfile
 
+    def _parse_remove_response(self, response_xml):
+        success_node = response_xml.find('.//success')
+        success = str_to_bool(success_node.text)
+        error_node = response_xml.find('.//error')
+        error = error_node.text
+        return (success, error)
+
     @command(commandtypes.COMMAND_TYPE_LIST_DIR, _parse_list_dir_response)
     def list_dir(self, path):
         return {'path': path}
@@ -115,4 +122,8 @@ class FSAL(object):
 
     @command(commandtypes.COMMAND_TYPE_ISFILE, _parse_isfile_response)
     def isfile(self, path):
+        return {'path': path}
+
+    @command(commandtypes.COMMAND_TYPE_REMOVE, _parse_remove_response)
+    def remove(self, path):
         return {'path': path}
