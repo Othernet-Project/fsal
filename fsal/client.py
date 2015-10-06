@@ -87,10 +87,21 @@ class FSAL(object):
         exists = str_to_bool(exists_node.text)
         return success and exists
 
+    def _parse_isdir_response(self, response_xml):
+        success_node = response_xml.find('.//success')
+        success = str_to_bool(success_node.text)
+        isdir_node = response_xml.find('.//isdir')
+        isdir = str_to_bool(isdir_node.text)
+        return success and isdir
+
     @command(commandtypes.COMMAND_TYPE_LIST_DIR, _parse_list_dir_response)
     def list_dir(self, path):
         return {'path': path}
 
     @command(commandtypes.COMMAND_TYPE_EXISTS, _parse_exists_response)
     def exists(self, path):
+        return {'path': path}
+
+    @command(commandtypes.COMMAND_TYPE_ISDIR, _parse_isdir_response)
+    def isdir(self, path):
         return {'path': path}
