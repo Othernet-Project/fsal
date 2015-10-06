@@ -100,14 +100,16 @@ class DirectoryListingResponse:
 
 
 class CommandResponseFactory:
+    default_response_generator = GenericResponse
     response_map = {
-        commandtypes.COMMAND_TYPE_LIST_DIR: DirectoryListingResponse,
-        commandtypes.COMMAND_TYPE_EXISTS: GenericResponse,
+        commandtypes.COMMAND_TYPE_LIST_DIR: DirectoryListingResponse
     }
 
     def create_response(self, response_data):
         command_type = response_data['type']
-        if command_type not in self.response_map:
-            return None
-        else:
-            return self.response_map[command_type](response_data)
+        try:
+            response_generator = self.response_map[command_type]
+        except KeyError:
+            response_generator = self.default_response_generator
+
+        return response_generator(response_data)
