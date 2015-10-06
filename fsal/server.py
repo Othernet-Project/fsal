@@ -50,7 +50,6 @@ def consume_command_queue(command_queue):
         command_queue.task_done()
 
 
-
 def read_request(sock, buff_size=2048):
     data = buff = sock.recv(buff_size)
     while buff and '\0' not in buff:
