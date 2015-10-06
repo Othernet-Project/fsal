@@ -17,8 +17,8 @@ import shutil
 
 import scandir
 
-from fs import File, Directory
-from commandtypes import COMMAND_TYPE_LIST_DIR, COMMAND_TYPE_COPY
+from .import commandtypes
+from .fs import File, Directory
 
 
 class CommandHandler(object):
@@ -31,13 +31,16 @@ class CommandHandler(object):
         self.config = config
 
     def do_command(self):
-        result = dict()
-        result['type'] = self.command_type
+        raise NotImplementedError()
+
+    def send_result(self, **kwargs):
+        result = dict(type=self.command_type)
+        result.update(kwargs)
         return result
 
 
 class DirectoryListingCommandHandler(CommandHandler):
-    command_type = COMMAND_TYPE_LIST_DIR
+    command_type = commandtypes.COMMAND_TYPE_LIST_DIR
 
     def do_command(self):
         path = self.command_data['params']['path']
@@ -57,15 +60,12 @@ class DirectoryListingCommandHandler(CommandHandler):
                 else:
                     files.append(File.from_path(base_path, rel_path))
 
-        result = super(DirectoryListingCommandHandler, self).do_command()
-        result['success'] = success
-        result['params'] = {'base_path': base_path, 'dirs': dirs,
-                            'files': files}
-        return result
+        params = {'base_path': base_path, 'dirs': dirs, 'files': files}
+        return self.send_result(success=success, params=params)
 
 
 class CopyCommandHandler(CommandHandler):
-    command_type = COMMAND_TYPE_COPY
+    command_type = commandtypes.COMMAND_TYPE_COPY
 
     is_synchronous = False
 
@@ -81,15 +81,80 @@ class CopyCommandHandler(CommandHandler):
             pass
 
 
+class ExistsCommandHandler(CommandHandler):
+    command_type = commandtypes.COMMAND_TYPE_EXISTS
+
+    def do_command(self):
+        path = self.command_data['params']['path']
+        base_path = self.config['fsal.basepath']
+        full_path = os.path.join(base_path, path)
+        exists = os.path.exists(full_path)
+        params = {'base_path': base_path, 'exists': exists}
+        return self.send_result(success=True, params=params)
+
+
+class IsDirCommandHandler(CommandHandler):
+    command_type = commandtypes.COMMAND_TYPE_ISDIR
+
+    def do_command(self):
+        path = self.command_data['params']['path']
+        base_path = self.config['fsal.basepath']
+        full_path = os.path.join(base_path, path)
+        isdir = os.path.isdir(full_path)
+        params = {'base_path': base_path, 'isdir': isdir}
+        return self.send_result(success=True, params=params)
+
+
+class IsFileCommandHandler(CommandHandler):
+    command_type = commandtypes.COMMAND_TYPE_ISFILE
+
+    def do_command(self):
+        path = self.command_data['params']['path']
+        base_path = self.config['fsal.basepath']
+        full_path = os.path.join(base_path, path)
+        isfile = os.path.isfile(full_path)
+        params = {'base_path': base_path, 'isfile': isfile}
+        return self.send_result(success=True, params=params)
+
+
+class RemoveCommandHandler(CommandHandler):
+    command_type = commandtypes.COMMAND_TYPE_REMOVE
+
+    def __removal(self, removal_func, path):
+        base_path = self.config['fsal.basepath']
+        try:
+            removal_func(path)
+        except Exception as exc:
+            params = {'base_path': base_path, 'error': str(exc)}
+            return self.send_result(success=False, params=params)
+        else:
+            params = {'base_path': base_path, 'error': None}
+            return self.send_result(success=True, params=params)
+
+    def do_command(self):
+        path = self.command_data['params']['path']
+        base_path = self.config['fsal.basepath']
+        full_path = os.path.join(base_path, path)
+        if not os.path.exists(full_path):
+            params = {'base_path': base_path, 'error': 'does_not_exist'}
+            return self.send_result(success=False, params=params)
+
+        remover = shutil.rmtree if os.path.isdir(full_path) else os.remove
+        return self.__removal(remover, full_path)
+
+
 class CommandHandlerFactory(object):
-    handler_map = {
-        COMMAND_TYPE_LIST_DIR: DirectoryListingCommandHandler,
-        COMMAND_TYPE_COPY: CopyCommandHandler
-    }
+
+    def __init__(self):
+        all_handlers = CommandHandler.__subclasses__()
+        self.handler_map = dict((handler_cls.command_type, handler_cls)
+                                for handler_cls in all_handlers)
 
     def create_handler(self, command_data, config):
         command_type = command_data['type']
-        if command_type not in self.handler_map:
+        try:
+            handler_cls = self.handler_map[command_type]
+        except KeyError:
             return None
         else:
-            return self.handler_map[command_type](command_data, config)
+            return handler_cls(command_data, config)

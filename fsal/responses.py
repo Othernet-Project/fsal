@@ -14,7 +14,7 @@ from datetime import datetime
 
 from xml.etree.ElementTree import Element, SubElement, tostring
 
-from commandtypes import COMMAND_TYPE_LIST_DIR
+from . import commandtypes
 
 
 def create_response_xml_root():
@@ -24,6 +24,37 @@ def create_response_xml_root():
 def to_timestamp(dt, epoch=datetime(1970, 1, 1)):
     delta = dt - epoch
     return delta.total_seconds()
+
+
+def singular_name(name):
+    """Returns same string without it's trailing character, which hopefully is
+    satisfactory to make the word singular, but it probably isn't."""
+    return name[:-1]
+
+
+def dict_to_xml(data, root=None):
+    root = Element('response') if root is None else root
+    for key, value in data.items():
+        subnode = SubElement(root, key)
+        if isinstance(value, dict):
+            dict_to_xml(value, root=subnode)
+        elif isinstance(value, list):
+            for v in value:
+                dict_to_xml({singular_name(key): v}, root=subnode)
+        else:
+            subnode.text = str(value)
+    return root
+
+
+class GenericResponse:
+    def __init__(self, response_data):
+        self.response_data = response_data
+
+    def get_xml(self):
+        return dict_to_xml(self.response_data)
+
+    def get_xml_str(self):
+        return tostring(self.get_xml())
 
 
 class DirectoryListingResponse:
@@ -69,11 +100,16 @@ class DirectoryListingResponse:
 
 
 class CommandResponseFactory:
-    response_map = {COMMAND_TYPE_LIST_DIR: DirectoryListingResponse}
+    default_response_generator = GenericResponse
+    response_map = {
+        commandtypes.COMMAND_TYPE_LIST_DIR: DirectoryListingResponse
+    }
 
     def create_response(self, response_data):
         command_type = response_data['type']
-        if command_type not in self.response_map:
-            return None
-        else:
-            return self.response_map[command_type](response_data)
+        try:
+            response_generator = self.response_map[command_type]
+        except KeyError:
+            response_generator = self.default_response_generator
+
+        return response_generator(response_data)

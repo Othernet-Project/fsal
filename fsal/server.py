@@ -26,9 +26,9 @@ import xmltodict
 import xml.etree.ElementTree as ET
 from gevent.server import StreamServer
 
-from confloader import ConfDict
-from handlers import CommandHandlerFactory
-from responses import CommandResponseFactory
+from .confloader import ConfDict
+from .handlers import CommandHandlerFactory
+from .responses import CommandResponseFactory
 
 IN_ENCODING = 'ascii'
 OUT_ENCODING = 'utf-8'
@@ -42,13 +42,6 @@ response_factory = CommandResponseFactory()
 def in_pkg(*paths):
     """ Return path relative to module directory """
     return normpath(join(MODDIR, *paths))
-
-
-def parse_config_path():
-    regex = r'--conf[=\s]{1}((["\']{1}(.+)["\']{1})|([^\s]+))\s*'
-    arg_str = ' '.join(sys.argv[1:])
-    result = re.search(regex, arg_str)
-    return result.group(1).strip(' \'"') if result else None
 
 
 def consume_command_queue(command_queue):
@@ -79,12 +72,6 @@ def parse_request(request_str):
     return ET.fromstring(request_str)
 
 
-
-def get_config_path():
-    default_path = in_pkg('fsal-server.ini')
-    return parse_config_path() or default_path
-
-
 class FSALServer(object):
 
     def __init__(self, config):
@@ -113,7 +100,6 @@ class FSALServer(object):
         sock.listen(1)
         return sock
 
-
     @contextmanager
     def open_socket(self):
         sock = self.prepare_socket(self._config['fsal.socket'])
@@ -125,7 +111,15 @@ class FSALServer(object):
 
 
 def main():
-    config_path = get_config_path()
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Start FSAL server')
+    parser.add_argument('--conf', metavar='PATH',
+                        help='Path to configuration file',
+                        default=in_pkg('fsal-server.conf'))
+    args = parser.parse_args()
+
+    config_path = args.conf
     config = ConfDict.from_file(config_path, catchall=True, autojson=True)
     server = FSALServer(config)
     server.run()
