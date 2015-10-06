@@ -40,7 +40,7 @@ def dict_to_xml(data, root=None):
             dict_to_xml(value, root=subnode)
         elif isinstance(value, list):
             for v in value:
-                dict_to_xml({singular_name(key): v}, subnode)
+                dict_to_xml({singular_name(key): v}, root=subnode)
         else:
             subnode.text = str(value)
     return root
