@@ -17,8 +17,8 @@ import shutil
 
 import scandir
 
+from .import commandtypes
 from .fs import File, Directory
-from .commandtypes import COMMAND_TYPE_LIST_DIR, COMMAND_TYPE_COPY
 
 
 class CommandHandler(object):
@@ -31,13 +31,16 @@ class CommandHandler(object):
         self.config = config
 
     def do_command(self):
-        result = dict()
-        result['type'] = self.command_type
+        raise NotImplementedError()
+
+    def send_result(self, **kwargs):
+        result = dict(type=self.command_type)
+        result.update(kwargs)
         return result
 
 
 class DirectoryListingCommandHandler(CommandHandler):
-    command_type = COMMAND_TYPE_LIST_DIR
+    command_type = commandtypes.COMMAND_TYPE_LIST_DIR
 
     def do_command(self):
         path = self.command_data['params']['path']
@@ -57,15 +60,12 @@ class DirectoryListingCommandHandler(CommandHandler):
                 else:
                     files.append(File.from_path(base_path, rel_path))
 
-        result = super(DirectoryListingCommandHandler, self).do_command()
-        result['success'] = success
-        result['params'] = {'base_path': base_path, 'dirs': dirs,
-                            'files': files}
-        return result
+        params = {'base_path': base_path, 'dirs': dirs, 'files': files}
+        return self.send_result(success=success, params=params)
 
 
 class CopyCommandHandler(CommandHandler):
-    command_type = COMMAND_TYPE_COPY
+    command_type = commandtypes.COMMAND_TYPE_COPY
 
     is_synchronous = False
 
@@ -81,10 +81,23 @@ class CopyCommandHandler(CommandHandler):
             pass
 
 
+class ExistsCommandHandler(CommandHandler):
+    command_type = commandtypes.COMMAND_TYPE_EXISTS
+
+    def do_command(self):
+        path = self.command_data['params']['path']
+        base_path = self.config['fsal.basepath']
+        full_path = os.path.join(base_path, path)
+        exists = os.path.exists(full_path)
+        params = {'base_path': base_path, 'exists': exists}
+        return self.send_result(success=True, params=params)
+
+
 class CommandHandlerFactory(object):
     handler_map = {
-        COMMAND_TYPE_LIST_DIR: DirectoryListingCommandHandler,
-        COMMAND_TYPE_COPY: CopyCommandHandler
+        commandtypes.COMMAND_TYPE_LIST_DIR: DirectoryListingCommandHandler,
+        commandtypes.COMMAND_TYPE_COPY: CopyCommandHandler,
+        commandtypes.COMMAND_TYPE_EXISTS: ExistsCommandHandler,
     }
 
     def create_handler(self, command_data, config):
