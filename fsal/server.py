@@ -16,8 +16,6 @@ from gevent import monkey
 monkey.patch_all(thread=False, aggressive=True)
 
 import os
-import re
-import sys
 import socket
 import signal
 from contextlib import contextmanager
