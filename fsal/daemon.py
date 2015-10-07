@@ -25,7 +25,6 @@ if __name__ == "__main__":
         sys.exit(1)
 
     # decouple from parent environment
-    # os.chdir("/var/www/maxpay")   #don't prevent unmounting....
     os.setsid()
     os.umask(0)
 
