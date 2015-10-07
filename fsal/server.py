@@ -119,7 +119,7 @@ def main():
     parser.add_argument('--conf', metavar='PATH',
                         help='Path to configuration file',
                         default=in_pkg('fsal-server.ini'))
-    args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
 
     config_path = args.conf
     config = ConfDict.from_file(config_path, catchall=True, autojson=True)
