@@ -108,6 +108,20 @@ class FSAL(object):
         error = error_node.text
         return (success, error)
 
+    def _parse_search_response(self, response_xml):
+        dirs = []
+        files = []
+        is_match = str_to_bool(response_xml.find('.//is-match').text)
+        base_path = response_xml.find('.//base-path').text
+        dirs_node = response_xml.find('.//dirs')
+        for child in dirs_node:
+            dirs.append(Directory.from_xml(base_path, child))
+        files_node = response_xml.find('.//files')
+        for child in files_node:
+            files.append(File.from_xml(base_path, child))
+        return (dirs, files, is_match)
+
+
     @command(commandtypes.COMMAND_TYPE_LIST_DIR, _parse_list_dir_response)
     def list_dir(self, path):
         return {'path': path}
@@ -127,3 +141,7 @@ class FSAL(object):
     @command(commandtypes.COMMAND_TYPE_REMOVE, _parse_remove_response)
     def remove(self, path):
         return {'path': path}
+
+    @command(commandtypes.COMMAND_TYPE_SEARCH, _parse_search_response)
+    def search(self, query):
+        return {'query': query}
