@@ -36,7 +36,8 @@ class FSObject(object):
 class File(FSObject):
 
     def __init__(self, base_path, rel_path, size, create_date, modify_date):
-        super(File, self).__init__(base_path, rel_path, create_date, modify_date)
+        super(File, self).__init__(base_path, rel_path, create_date,
+                                   modify_date)
         self._size = size
 
     @property
@@ -73,8 +74,8 @@ class Directory(FSObject):
         create_date = datetime.fromtimestamp(float(create_timestamp))
         modify_timestamp = file_xml.find('modify-timestamp').text
         modify_date = datetime.fromtimestamp(float(modify_timestamp))
-        return cls(base_path=base_path, rel_path=rel_path, create_date=create_date,
-                   modify_date=modify_date)
+        return cls(base_path=base_path, rel_path=rel_path,
+                   create_date=create_date, modify_date=modify_date)
 
     @classmethod
     def from_path(cls, base_path, rel_path):
