@@ -77,12 +77,12 @@ class FSAL(object):
             base_path = response_xml.find('.//base-path').text
             dirs_node = response_xml.find('.//dirs')
             files_node = response_xml.find('.//files')
-            dirs = iter_fsobjs(dirs_node,
-                               lambda n: Directory.from_xml(base_path, n))
-            files = iter_fsobjs(files_node,
-                                lambda n: File.from_xml(base_path, n))
+            dirs = list(iter_fsobjs(dirs_node,
+                               lambda n: Directory.from_xml(base_path, n)))
+            files = list(iter_fsobjs(files_node,
+                                lambda n: File.from_xml(base_path, n)))
 
-        return (dirs, files)
+        return (success, dirs, files)
 
     def _parse_exists_response(self, response_xml):
         success_node = response_xml.find('.//success')
@@ -113,7 +113,7 @@ class FSAL(object):
         return (success, error)
 
     def _parse_search_response(self, response_xml):
-        dirs, files = self._parse_list_dir_response(response_xml)
+        success, dirs, files = self._parse_list_dir_response(response_xml)
         is_match = str_to_bool(response_xml.find('.//is-match').text)
         return (dirs, files, is_match)
 
