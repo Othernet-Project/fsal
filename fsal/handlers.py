@@ -92,7 +92,7 @@ class DirectoryListingCommandHandler(CommandHandler):
         files = []
         base_path = self.config['fsal.basepath']
         full_path = os.path.join(base_path, path)
-        if os.path.exists(full_path):
+        if os.path.exists(full_path) and os.path.isdir(full_path):
             success = True
             for entry in scandir.scandir(full_path):
                 rel_path = os.path.relpath(entry.path, base_path)
