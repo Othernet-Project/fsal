@@ -67,6 +67,10 @@ class File(FSObject):
 
 class Directory(FSObject):
 
+    def other_path(self, path):
+        path.lstrip(os.sep)
+        return os.path.normpath(os.path.join(self.rel_path, path))
+
     @classmethod
     def from_xml(cls, base_path, file_xml):
         rel_path = file_xml.find('rel-path').text
