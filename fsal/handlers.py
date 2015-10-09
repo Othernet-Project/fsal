@@ -127,10 +127,11 @@ class SearchCommandHandler(CommandHandler):
                     files.append(File.from_path(base_path, rel_path))
         else:
             is_match = False
-            keywords = query.split()
+            keywords = [k.lower() for k in query.split()]
 
             def path_checker(path):
                 tmp, name = os.path.split(path)
+                name = name.lower()
                 return any(k in name for k in keywords)
 
             for path in fnwalk(base_path, path_checker):
