@@ -55,6 +55,12 @@ def iter_fsobjs(xml_node, constructor_func):
         yield constructor_func(child)
 
 
+def sort_listing(fso_list):
+    """
+    Sort list of FSObject in-place
+    """
+    fso_list.sort(key=lambda fso: fso.name)
+
 class FSAL(object):
 
     def __init__(self, socket_path):
@@ -81,7 +87,8 @@ class FSAL(object):
                                lambda n: Directory.from_xml(base_path, n)))
             files = list(iter_fsobjs(files_node,
                                 lambda n: File.from_xml(base_path, n)))
-
+            sort_listing(dirs)
+            sort_listing(files)
         return (success, dirs, files)
 
     def _parse_exists_response(self, response_xml):
