@@ -110,6 +110,9 @@ class SearchCommandHandler(CommandHandler):
 
     def do_command(self):
         query = self.command_data['params']['query']
+        if query is None or len(query) == 0:
+            return self.send_result(success=False)
+
         if(query[0] == '/'):
             query = query[1:]
         is_match = False

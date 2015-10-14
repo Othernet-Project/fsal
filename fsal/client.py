@@ -121,7 +121,7 @@ class FSAL(object):
 
     def _parse_search_response(self, response_xml):
         success, dirs, files = self._parse_list_dir_response(response_xml)
-        is_match = str_to_bool(response_xml.find('.//is-match').text)
+        is_match = success and str_to_bool(response_xml.find('.//is-match').text)
         return (dirs, files, is_match)
 
     @command(commandtypes.COMMAND_TYPE_LIST_DIR, _parse_list_dir_response)
