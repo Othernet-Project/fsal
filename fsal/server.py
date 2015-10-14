@@ -28,6 +28,9 @@ from gevent.server import StreamServer
 from .confloader import ConfDict
 from .handlers import CommandHandlerFactory
 from .responses import CommandResponseFactory
+from .fsdbmanager import FSDBManager
+from .db.databases import get_databases, apply_migrations
+
 
 IN_ENCODING = 'ascii'
 OUT_ENCODING = 'utf-8'
@@ -72,7 +75,7 @@ def parse_request(request_str):
 
 class FSALServer(object):
 
-    def __init__(self, config):
+    def __init__(self, config, fs_manager):
         self._config = config
         self._server = None
 
@@ -124,7 +127,13 @@ def main():
     config_path = args.conf
     config = ConfDict.from_file(config_path, catchall=True, autojson=True)
 
-    server = FSALServer(config)
+    databases = get_databases(config)
+    apply_migrations(config, databases)
+
+    fs_manager = FSDBManager(config, databases)
+    fs_manager.start()
+
+    server = FSALServer(config, fs_manager)
 
     signal.signal(signal.SIGINT, lambda *a, **k: server.stop())
     signal.signal(signal.SIGTERM, lambda *a, **k: server.stop())
