@@ -62,6 +62,12 @@ def fnwalk(path, fn, shallow=False):
                 yield entry.path
 
 
+def validate_path(base_path, path):
+    path = path.lstrip(os.sep)
+    full_path = os.path.abspath(os.path.join(base_path, path))
+    return full_path.startswith(base_path), full_path
+
+
 class CommandHandler(object):
     command_type = None
 
@@ -84,15 +90,13 @@ class DirectoryListingCommandHandler(CommandHandler):
     command_type = commandtypes.COMMAND_TYPE_LIST_DIR
 
     def do_command(self):
-        path = self.command_data['params']['path']
-        if(path[0] == '/'):
-            path = path[1:]
         success = False
         dirs = []
         files = []
         base_path = self.config['fsal.basepath']
-        full_path = os.path.join(base_path, path)
-        if os.path.isdir(full_path):
+        path = self.command_data['params']['path']
+        is_valid, full_path = validate_path(base_path, path)
+        if is_valid and os.path.isdir(full_path):
             success = True
             for entry in scandir.scandir(full_path):
                 rel_path = os.path.relpath(entry.path, base_path)
@@ -113,14 +117,12 @@ class SearchCommandHandler(CommandHandler):
         if query is None or len(query) == 0:
             return self.send_result(success=False)
 
-        if(query[0] == '/'):
-            query = query[1:]
         is_match = False
         dirs = []
         files = []
         base_path = self.config['fsal.basepath']
-        full_path = os.path.join(base_path, query)
-        if os.path.isdir(full_path):
+        is_valid, full_path = validate_path(base_path, query)
+        if is_valid and os.path.isdir(full_path):
             is_match = True
             for entry in scandir.scandir(full_path):
                 rel_path = os.path.relpath(entry.path, base_path)
@@ -157,6 +159,11 @@ class CopyCommandHandler(CommandHandler):
     def do_command(self):
         source_path = self.command_data['params']['source']
         dest_path = self.command_data['params']['dest']
+        base_path = self.config['fsal.basepath']
+        source_valid, source_path = validate_path(base_path, source_path)
+        dest_valid, dest_path = validate_path(base_path, dest_path)
+        if not (source_valid and dest_valid):
+            return
         try:
             if os.path.isdir(source_path):
                 shutil.copytree(source_path, dest_path)
@@ -172,8 +179,8 @@ class ExistsCommandHandler(CommandHandler):
     def do_command(self):
         path = self.command_data['params']['path']
         base_path = self.config['fsal.basepath']
-        full_path = os.path.join(base_path, path)
-        exists = os.path.exists(full_path)
+        is_valid, full_path = validate_path(base_path, path)
+        exists = is_valid and os.path.exists(full_path)
         params = {'base_path': base_path, 'exists': exists}
         return self.send_result(success=True, params=params)
 
@@ -184,8 +191,8 @@ class IsDirCommandHandler(CommandHandler):
     def do_command(self):
         path = self.command_data['params']['path']
         base_path = self.config['fsal.basepath']
-        full_path = os.path.join(base_path, path)
-        isdir = os.path.isdir(full_path)
+        is_valid, full_path = validate_path(base_path, path)
+        isdir = is_valid and os.path.isdir(full_path)
         params = {'base_path': base_path, 'isdir': isdir}
         return self.send_result(success=True, params=params)
 
@@ -196,8 +203,8 @@ class IsFileCommandHandler(CommandHandler):
     def do_command(self):
         path = self.command_data['params']['path']
         base_path = self.config['fsal.basepath']
-        full_path = os.path.join(base_path, path)
-        isfile = os.path.isfile(full_path)
+        is_valid, full_path = validate_path(base_path, path)
+        isfile = is_valid and os.path.isfile(full_path)
         params = {'base_path': base_path, 'isfile': isfile}
         return self.send_result(success=True, params=params)
 
@@ -219,8 +226,8 @@ class RemoveCommandHandler(CommandHandler):
     def do_command(self):
         path = self.command_data['params']['path']
         base_path = self.config['fsal.basepath']
-        full_path = os.path.join(base_path, path)
-        if not os.path.exists(full_path):
+        is_valid, full_path = validate_path(base_path, path)
+        if not (is_valid and os.path.exists(full_path)):
             params = {'base_path': base_path, 'error': 'does_not_exist'}
             return self.send_result(success=False, params=params)
 
