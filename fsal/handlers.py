@@ -75,7 +75,9 @@ class CommandHandler(object):
 
     def __init__(self, command_data, config):
         self.command_data = command_data
-        self.config = config
+        self.base_path = os.path.abspath(config['fsal.basepath'])
+        if not os.path.isdir(self.base_path):
+            raise RuntimeError('Invalid basepath: "%s"'%(self.base_path))
 
     def do_command(self):
         raise NotImplementedError()
@@ -93,19 +95,21 @@ class DirectoryListingCommandHandler(CommandHandler):
         success = False
         dirs = []
         files = []
-        base_path = self.config['fsal.basepath']
         path = self.command_data['params']['path']
-        is_valid, full_path = validate_path(base_path, path)
+        if path is None or len(path) == 0:
+            return self.send_result(success=False)
+
+        is_valid, full_path = validate_path(self.base_path, path)
         if is_valid and os.path.isdir(full_path):
             success = True
             for entry in scandir.scandir(full_path):
-                rel_path = os.path.relpath(entry.path, base_path)
+                rel_path = os.path.relpath(entry.path, self.base_path)
                 if entry.is_dir():
-                    dirs.append(Directory.from_path(base_path, rel_path))
+                    dirs.append(Directory.from_path(self.base_path, rel_path))
                 else:
-                    files.append(File.from_path(base_path, rel_path))
+                    files.append(File.from_path(self.base_path, rel_path))
 
-        params = {'base_path': base_path, 'dirs': dirs, 'files': files}
+        params = {'base_path': self.base_path, 'dirs': dirs, 'files': files}
         return self.send_result(success=success, params=params)
 
 
@@ -120,16 +124,15 @@ class SearchCommandHandler(CommandHandler):
         is_match = False
         dirs = []
         files = []
-        base_path = self.config['fsal.basepath']
-        is_valid, full_path = validate_path(base_path, query)
+        is_valid, full_path = validate_path(self.base_path, query)
         if is_valid and os.path.isdir(full_path):
             is_match = True
             for entry in scandir.scandir(full_path):
-                rel_path = os.path.relpath(entry.path, base_path)
+                rel_path = os.path.relpath(entry.path, self.base_path)
                 if entry.is_dir():
-                    dirs.append(Directory.from_path(base_path, rel_path))
+                    dirs.append(Directory.from_path(self.base_path, rel_path))
                 else:
-                    files.append(File.from_path(base_path, rel_path))
+                    files.append(File.from_path(self.base_path, rel_path))
         else:
             is_match = False
             keywords = [k.lower() for k in query.split()]
@@ -139,14 +142,14 @@ class SearchCommandHandler(CommandHandler):
                 name = name.lower()
                 return any(k in name for k in keywords)
 
-            for path in fnwalk(base_path, path_checker):
-                rel_path = os.path.relpath(path, base_path)
+            for path in fnwalk(self.base_path, path_checker):
+                rel_path = os.path.relpath(path,self.base_path)
                 if os.path.isdir(path):
-                    dirs.append(Directory.from_path(base_path, rel_path))
+                    dirs.append(Directory.from_path(self.base_path, rel_path))
                 else:
-                    files.append(File.from_path(base_path, rel_path))
+                    files.append(File.from_path(self.base_path, rel_path))
 
-        params = {'base_path': base_path, 'dirs': dirs, 'files': files,
+        params = {'base_path':self.base_path, 'dirs': dirs, 'files': files,
                   'is_match': is_match}
         return self.send_result(success=True, params=params)
 
@@ -159,9 +162,8 @@ class CopyCommandHandler(CommandHandler):
     def do_command(self):
         source_path = self.command_data['params']['source']
         dest_path = self.command_data['params']['dest']
-        base_path = self.config['fsal.basepath']
-        source_valid, source_path = validate_path(base_path, source_path)
-        dest_valid, dest_path = validate_path(base_path, dest_path)
+        source_valid, source_path = validate_path(self.base_path, source_path)
+        dest_valid, dest_path = validate_path(self.base_path, dest_path)
         if not (source_valid and dest_valid):
             return
         try:
@@ -178,10 +180,9 @@ class ExistsCommandHandler(CommandHandler):
 
     def do_command(self):
         path = self.command_data['params']['path']
-        base_path = self.config['fsal.basepath']
-        is_valid, full_path = validate_path(base_path, path)
+        is_valid, full_path = validate_path(self.base_path, path)
         exists = is_valid and os.path.exists(full_path)
-        params = {'base_path': base_path, 'exists': exists}
+        params = {'base_path':self.base_path, 'exists': exists}
         return self.send_result(success=True, params=params)
 
 
@@ -190,10 +191,9 @@ class IsDirCommandHandler(CommandHandler):
 
     def do_command(self):
         path = self.command_data['params']['path']
-        base_path = self.config['fsal.basepath']
-        is_valid, full_path = validate_path(base_path, path)
+        is_valid, full_path = validate_path(self.base_path, path)
         isdir = is_valid and os.path.isdir(full_path)
-        params = {'base_path': base_path, 'isdir': isdir}
+        params = {'base_path':self.base_path, 'isdir': isdir}
         return self.send_result(success=True, params=params)
 
 
@@ -202,10 +202,9 @@ class IsFileCommandHandler(CommandHandler):
 
     def do_command(self):
         path = self.command_data['params']['path']
-        base_path = self.config['fsal.basepath']
-        is_valid, full_path = validate_path(base_path, path)
+        is_valid, full_path = validate_path(self.base_path, path)
         isfile = is_valid and os.path.isfile(full_path)
-        params = {'base_path': base_path, 'isfile': isfile}
+        params = {'base_path':self.base_path, 'isfile': isfile}
         return self.send_result(success=True, params=params)
 
 
@@ -213,22 +212,20 @@ class RemoveCommandHandler(CommandHandler):
     command_type = commandtypes.COMMAND_TYPE_REMOVE
 
     def __removal(self, removal_func, path):
-        base_path = self.config['fsal.basepath']
         try:
             removal_func(path)
         except Exception as exc:
-            params = {'base_path': base_path, 'error': str(exc)}
+            params = {'base_path':self.base_path, 'error': str(exc)}
             return self.send_result(success=False, params=params)
         else:
-            params = {'base_path': base_path, 'error': None}
+            params = {'base_path':self.base_path, 'error': None}
             return self.send_result(success=True, params=params)
 
     def do_command(self):
         path = self.command_data['params']['path']
-        base_path = self.config['fsal.basepath']
-        is_valid, full_path = validate_path(base_path, path)
+        is_valid, full_path = validate_path(self.base_path, path)
         if not (is_valid and os.path.exists(full_path)):
-            params = {'base_path': base_path, 'error': 'does_not_exist'}
+            params = {'base_path':self.base_path, 'error': 'does_not_exist'}
             return self.send_result(success=False, params=params)
 
         remover = shutil.rmtree if os.path.isdir(full_path) else os.remove
