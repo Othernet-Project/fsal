@@ -32,6 +32,9 @@ class FSObject(object):
     def modify_date(self):
         return self._modify_date
 
+    def is_dir(self):
+        return False
+
 
 class File(FSObject):
 
@@ -64,8 +67,17 @@ class File(FSObject):
         return cls(base_path=base_path, rel_path=rel_path, size=size,
                    create_date=create_date, modify_date=modify_date)
 
+    @classmethod
+    def from_db_row(cls, base_path, row):
+        rel_path = row.path
+        return cls(base_path=base_path, rel_path=rel_path, size=row.size,
+                   create_date=row.create_time, modify_date=row.modify_time)
+
 
 class Directory(FSObject):
+
+    def is_dir(self):
+        return True
 
     def other_path(self, path):
         path.lstrip(os.sep)
@@ -88,3 +100,9 @@ class Directory(FSObject):
         modify_date = datetime.fromtimestamp(os.path.getmtime(full_path))
         return cls(base_path=base_path, rel_path=rel_path,
                    create_date=create_date, modify_date=modify_date)
+
+    @classmethod
+    def from_db_row(cls, base_path, row):
+        rel_path = row.path
+        return cls(base_path=base_path, rel_path=rel_path,
+                   create_date=row.create_time, modify_date=row.modify_time)

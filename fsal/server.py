@@ -18,6 +18,7 @@ monkey.patch_all(thread=False, aggressive=True)
 import os
 import socket
 import signal
+import logging
 from contextlib import contextmanager
 from os.path import join, dirname, abspath, normpath
 
@@ -78,6 +79,7 @@ class FSALServer(object):
     def __init__(self, config, fs_manager):
         self._config = config
         self._server = None
+        self._fs_manager = fs_manager
 
     def run(self):
         with self.open_socket() as sock:
@@ -91,7 +93,7 @@ class FSALServer(object):
     def _request_handler(self, sock, address):
         request_data = xmltodict.parse(read_request(sock))['request']
         command_data = request_data['command']
-        handler = handler_factory.create_handler(command_data, self._config)
+        handler = handler_factory.create_handler(command_data, self._fs_manager)
         if handler.is_synchronous:
             send_response(sock, handler.do_command())
 
@@ -126,6 +128,8 @@ def main():
 
     config_path = args.conf
     config = ConfDict.from_file(config_path, catchall=True, autojson=True)
+
+    logging.basicConfig(level=logging.DEBUG)
 
     databases = get_databases(config)
     apply_migrations(config, databases)

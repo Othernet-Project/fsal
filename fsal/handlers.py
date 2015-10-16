@@ -15,61 +15,16 @@ from __future__ import absolute_import
 import os
 import shutil
 
-import scandir
-
 from .import commandtypes
-from .fs import File, Directory
-
-
-def fnwalk(path, fn, shallow=False):
-    """
-    Walk directory tree top-down until files or directory matching the
-    predicate are found
-
-    This generator function takes a ``path`` from which to begin the traversal,
-    and a ``fn`` object that selects the paths to be returned. It calls
-    ``os.listdir()`` recursively until either a full path is flagged by ``fn``
-    function as valid (by returning a truthy value) or ``os.listdir()`` fails
-    with ``OSError``.
-
-    This function has been added specifically to deal with large and deep
-    directory trees, and it's therefore not advisable to convert the return
-    values to lists and similar memory-intensive objects.
-
-    The ``shallow`` flag is used to terminate further recursion on match. If
-    ``shallow`` is ``False``, recursion continues even after a path is matched.
-
-    For example, given a path ``/foo/bar/bar``, and a matcher that matches
-    ``bar``, with ``shallow`` flag set to ``True``, only ``/foo/bar`` is
-    matched. Otherwise, both ``/foo/bar`` and ``/foo/bar/bar`` are matched.
-    """
-    if fn(path):
-        yield path
-        if shallow:
-            return
-
-    try:
-        entries = scandir.scandir(path)
-    except OSError:
-        return
-
-    for entry in entries:
-        if entry.is_dir():
-            for child in fnwalk(entry.path, fn, shallow):
-                yield child
-        else:
-            if fn(entry.path):
-                yield entry.path
-
 
 class CommandHandler(object):
     command_type = None
 
     is_synchronous = True
 
-    def __init__(self, command_data, config):
+    def __init__(self, command_data, fs_mgr):
         self.command_data = command_data
-        self.config = config
+        self.fs_mgr = fs_mgr
 
     def do_command(self):
         raise NotImplementedError()
@@ -87,21 +42,15 @@ class DirectoryListingCommandHandler(CommandHandler):
         path = self.command_data['params']['path']
         if(path[0] == '/'):
             path = path[1:]
-        success = False
+        success, fs_objs = self.fs_mgr.list_dir(path)
         dirs = []
         files = []
-        base_path = self.config['fsal.basepath']
-        full_path = os.path.join(base_path, path)
-        if os.path.isdir(full_path):
-            success = True
-            for entry in scandir.scandir(full_path):
-                rel_path = os.path.relpath(entry.path, base_path)
-                if entry.is_dir():
-                    dirs.append(Directory.from_path(base_path, rel_path))
-                else:
-                    files.append(File.from_path(base_path, rel_path))
-
-        params = {'base_path': base_path, 'dirs': dirs, 'files': files}
+        for fso in fs_objs:
+            if fso.is_dir():
+                dirs.append(fso)
+            else:
+                files.append(fso)
+        params = {'base_path': self.fs_mgr.base_path, 'dirs': dirs, 'files': files}
         return self.send_result(success=success, params=params)
 
 
@@ -113,35 +62,15 @@ class SearchCommandHandler(CommandHandler):
         if(query[0] == '/'):
             query = query[1:]
         is_match = False
+        is_match, fs_objs = self.fs_mgr.search(query)
         dirs = []
         files = []
-        base_path = self.config['fsal.basepath']
-        full_path = os.path.join(base_path, query)
-        if os.path.isdir(full_path):
-            is_match = True
-            for entry in scandir.scandir(full_path):
-                rel_path = os.path.relpath(entry.path, base_path)
-                if entry.is_dir():
-                    dirs.append(Directory.from_path(base_path, rel_path))
-                else:
-                    files.append(File.from_path(base_path, rel_path))
-        else:
-            is_match = False
-            keywords = [k.lower() for k in query.split()]
-
-            def path_checker(path):
-                tmp, name = os.path.split(path)
-                name = name.lower()
-                return any(k in name for k in keywords)
-
-            for path in fnwalk(base_path, path_checker):
-                rel_path = os.path.relpath(path, base_path)
-                if os.path.isdir(path):
-                    dirs.append(Directory.from_path(base_path, rel_path))
-                else:
-                    files.append(File.from_path(base_path, rel_path))
-
-        params = {'base_path': base_path, 'dirs': dirs, 'files': files,
+        for fso in fs_objs:
+            if fso.is_dir():
+                dirs.append(fso)
+            else:
+                files.append(fso)
+        params = {'base_path': self.fs_mgr.base_path, 'dirs': dirs, 'files': files,
                   'is_match': is_match}
         return self.send_result(success=True, params=params)
 

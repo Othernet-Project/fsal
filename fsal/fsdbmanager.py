@@ -1,66 +1,143 @@
 import os
+import logging
+from functools import partial
 
 import scandir
 
+from .utils import fnwalk
 from .fs import File, Directory
 
+import time
 
 FILE_TYPE = 0
 DIR_TYPE = 1
-TABLE_NAME = 'fsentries'
 
+FS_TABLE_NAME = 'fsentries'
+STATS_TABLE_NAME = 'dbmgr_stats'
 
 class FSDBManager(object):
     def __init__(self, config, databases):
-        self.config = config
+        self.base_path = os.path.abspath(config['fsal.basepath'])
+        if not os.path.isdir(self.base_path):
+            raise RuntimeError('Invalid basepath: "%s"'%(self.base_path))
+
         self.db = databases.fs
+        self.last_op_time = self._read_last_op_time()
 
     def start(self):
-        self._refresh_db()
+        self.refresh_db()
 
-    def _refresh_db(self):
-        base_path = self.config['fsal.basepath']
-        self._clear_db()
-        self._populate_db(base_path, base_path)
+    def is_valid_path(self, path):
+        path = path.lstrip(os.sep)
+        full_path = os.path.abspath(os.path.join(self.base_path, path))
+        return full_path.startswith(self.base_path)
+                
+    def list_dir(self, path):
+        if not self.is_valid_path(path):
+            return (False, [])
+        
+        if path == '.':
+            parent_id = 0
+        else:
+            q = self.db.Select('id', sets=FS_TABLE_NAME, where='path = ?')
+            self.db.query(q, path)
+            result = self.db.result
+            if not result:
+                return (False, [])
+            else:
+                parent_id = result.id
+            
+        q = self.db.Select('*', sets=FS_TABLE_NAME, where='parent_id = ?')
+        cursor = self.db.query(q, parent_id)
+        return (True, self._fso_row_iterator(cursor))
+    
+    def search(self, query):
+        if self.is_valid_path(query):
+            success, files = self.list_dir(query)
+            if success:
+                return (success, files)
+        
+        keywords = ["%%%s%%" % k for k in query.split()]
+        q = self.db.Select('*', sets=FS_TABLE_NAME)
+        for _ in keywords:
+            q.where |= 'name LIKE ?'
+        
+        self.db.execute(q, keywords)
+        return (False, self._fso_row_iterator(self.db.cursor))
+        
 
+    def refresh_db(self):
+        self.prune_db()
+        self.update_db()
+    
+    def prune_db(self):
+        with self.db.transaction():
+            q = self.db.Select('path', sets=FS_TABLE_NAME)
+            for result in self.db.query(q):
+                path = result.path
+                full_path = os.path.join(self.base_path, path)
+                if not os.path.exists(full_path):
+                    q2 = self.db.Delete(FS_TABLE_NAME, where='path = ?')
+                    self.db.query(q2, path)
+                    logging.debug("Removing db entry for %s" % path)
+
+    def update_db(self):
+        def checker(path):
+            return (path != self.base_path and
+                    os.path.getmtime(path) > self.last_op_time)
+        
+        with self.db.transaction():
+            for path in fnwalk(self.base_path, checker):
+                rel_path = os.path.relpath(path, self.base_path)
+                logging.debug("Updating db entry for %s" % rel_path)
+                if os.path.isdir(path):
+                    fso = Directory.from_path(self.base_path, rel_path)
+                else:
+                    fso = File.from_path(self.base_path, rel_path)
+                self.update_entry(fso)
+        self._record_op_time()
+    
+    
+    def update_entry(self, fso):
+        parent, name = os.path.split(fso.rel_path)
+        q = self.db.Select('id', sets=FS_TABLE_NAME, where='path = ?')
+        self.db.query(q, parent)
+        parent_id = 0
+        result = self.db.result
+        if result:
+            parent_id = result.id
+
+        q = self.db.Replace(FS_TABLE_NAME, 
+                            cols=['parent_id', 'type', 'name', 'size', 'create_time', 
+                                  'modify_time', 'path'])
+        size = fso.size if hasattr(fso, 'size') else 0
+        type = DIR_TYPE if fso.is_dir() else FILE_TYPE
+        values = [parent_id, type, fso.name, size, fso.create_date, fso.modify_date, 
+                  fso.rel_path]
+        self.db.execute(q, values)
+        
     def _clear_db(self):
         with self.db.transaction():
-            q = self.db.Delete(TABLE_NAME)
+            q = self.db.Delete(FS_TABLE_NAME)
             self.db.execute(q)
 
-    def _add_to_db(self, fso, ftype, parent_id):
-        q = self.db.Insert(TABLE_NAME,
-                      cols=('parent_id', 'type', 'name', 'size', 'create_time',
-                            'modify_time', 'path'))
-        size = fso.size if hasattr(fso, 'size') else 0
-        values = (parent_id, ftype, fso.name, size, fso.create_date,
-                  fso.modify_date, fso.rel_path)
-        self.db.execute(q, values)
-        return self.db.cursor.lastrowid
+    def _fso_row_iterator(self, cursor):
+        for result in cursor:
+            type = result.type
+            cls = Directory if type == DIR_TYPE else File
+            yield cls.from_db_row(self.base_path, result)
 
-    def _get_from_db(self, path):
-        pass
 
-    def _populate_db(self, base_path, path, parent_id=0):
-        if not os.path.isdir(path):
-            return
-
-        try:
-            scandir.scandir(path)
-        except OSError:
-            return
-
-        dir_id = parent_id
-        if path != base_path:
-            rel_path = os.path.relpath(path, base_path)
-            dir = Directory.from_path(base_path, rel_path)
-            dir_id = self._add_to_db(dir, DIR_TYPE, parent_id)
-
-        for entry in scandir.scandir(path):
-            rel_path = os.path.relpath(entry.path, base_path)
-            if entry.is_dir(follow_symlinks=False):
-                self._populate_db(base_path, entry.path, dir_id)
-            else:
-                f = File.from_path(base_path, rel_path)
-                self._add_to_db(f, FILE_TYPE, dir_id)
-
+    def _read_last_op_time(self):
+        q = self.db.Select('op_time', sets=STATS_TABLE_NAME)
+        self.db.query(q)
+        op_time = self.db.result.op_time
+        # If the recorded op_time is greater than current time, assume system 
+        # time was modified and revert to epoch time
+        if op_time > time.time():
+            op_time = 0.0
+        return op_time
+    
+    def _record_op_time(self):
+        q = self.db.Update(STATS_TABLE_NAME, op_time=':op_time')
+        self.db.query(q, op_time=time.time())

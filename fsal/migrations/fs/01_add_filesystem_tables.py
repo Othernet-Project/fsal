@@ -8,7 +8,7 @@ create table fsentries
     size integer not null default 0,              -- size in bytes
     create_time timestamp not null,               -- UNIX timestamp of created time
     modify_time timestamp not null,               -- UNIX timestamp of modified time
-    path varchar not null                         -- path relative to base path
+    path varchar unique not null                         -- path relative to base path
 );
 """
 
