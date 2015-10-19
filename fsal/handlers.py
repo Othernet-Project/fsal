@@ -97,10 +97,11 @@ class ExistsCommandHandler(CommandHandler):
 
     def do_command(self):
         path = self.command_data['params']['path']
-        base_path = self.config['fsal.basepath']
-        full_path = os.path.join(base_path, path)
-        exists = os.path.exists(full_path)
-        params = {'base_path': base_path, 'exists': exists}
+        if path is None:
+            exists = False
+        else:
+            exists = self.fs_mgr.exists(path)
+        params = {'exists': exists}
         return self.send_result(success=True, params=params)
 
 
@@ -109,10 +110,11 @@ class IsDirCommandHandler(CommandHandler):
 
     def do_command(self):
         path = self.command_data['params']['path']
-        base_path = self.config['fsal.basepath']
-        full_path = os.path.join(base_path, path)
-        isdir = os.path.isdir(full_path)
-        params = {'base_path': base_path, 'isdir': isdir}
+        if path is None:
+            isdir = False
+        else:
+            isdir = self.fs_mgr.is_dir(path)
+        params = {'isdir': isdir}
         return self.send_result(success=True, params=params)
 
 
@@ -121,10 +123,11 @@ class IsFileCommandHandler(CommandHandler):
 
     def do_command(self):
         path = self.command_data['params']['path']
-        base_path = self.config['fsal.basepath']
-        full_path = os.path.join(base_path, path)
-        isfile = os.path.isfile(full_path)
-        params = {'base_path': base_path, 'isfile': isfile}
+        if path is None:
+            isfile = False
+        else:
+            isfile = self.fs_mgr.is_file(path)
+        params = {'isfile': isfile}
         return self.send_result(success=True, params=params)
 
 

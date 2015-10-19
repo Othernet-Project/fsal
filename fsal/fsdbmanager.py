@@ -31,11 +31,11 @@ class FSDBManager(object):
         path = path.lstrip(os.sep)
         full_path = os.path.abspath(os.path.join(self.base_path, path))
         return full_path.startswith(self.base_path)
-                
+
     def list_dir(self, path):
         if not self.is_valid_path(path):
             return (False, [])
-        
+
         if path == '.':
             parent_id = 0
         else:
@@ -46,30 +46,61 @@ class FSDBManager(object):
                 return (False, [])
             else:
                 parent_id = result.id
-            
+
         q = self.db.Select('*', sets=FS_TABLE_NAME, where='parent_id = ?')
         cursor = self.db.query(q, parent_id)
         return (True, self._fso_row_iterator(cursor))
-    
+
     def search(self, query):
         if self.is_valid_path(query):
             success, files = self.list_dir(query)
             if success:
                 return (success, files)
-        
+
         keywords = ["%%%s%%" % k for k in query.split()]
         q = self.db.Select('*', sets=FS_TABLE_NAME)
         for _ in keywords:
             q.where |= 'name LIKE ?'
-        
+
         self.db.execute(q, keywords)
         return (False, self._fso_row_iterator(self.db.cursor))
-        
+
+    def exists(self, path):
+        if not self.is_valid_path(path):
+            return False
+        if path in (os.sep, os.curdir):
+            return True
+        else:
+            q = self.db.Select('id', sets=FS_TABLE_NAME, where='path = ?', limit=1)
+            self.db.query(q, path)
+            return self.db.result is not None
+
+    def is_dir(self, path):
+        if not self.is_valid_path(path):
+            return False
+        if path in (os.sep, os.curdir):
+            return True
+        else:
+            q = self.db.Select('type', sets=FS_TABLE_NAME, where='path = ?', limit=1)
+            self.db.query(q, path)
+            result = self.db.result
+            return (result and result.type == DIR_TYPE)
+
+    def is_file(self, path):
+        if not self.is_valid_path(path):
+            return False
+        if path in (os.sep, os.curdir):
+            return True
+        else:
+            q = self.db.Select('type', sets=FS_TABLE_NAME, where='path = ?', limit=1)
+            self.db.query(q, path)
+            result = self.db.result
+            return (result and result.type == FILE_TYPE)
 
     def refresh_db(self):
         self.prune_db()
         self.update_db()
-    
+
     def prune_db(self):
         with self.db.transaction():
             q = self.db.Select('path', sets=FS_TABLE_NAME)
@@ -85,7 +116,7 @@ class FSDBManager(object):
         def checker(path):
             return (path != self.base_path and
                     os.path.getmtime(path) > self.last_op_time)
-        
+
         with self.db.transaction():
             for path in fnwalk(self.base_path, checker):
                 rel_path = os.path.relpath(path, self.base_path)
@@ -96,8 +127,8 @@ class FSDBManager(object):
                     fso = File.from_path(self.base_path, rel_path)
                 self.update_entry(fso)
         self._record_op_time()
-    
-    
+
+
     def update_entry(self, fso):
         parent, name = os.path.split(fso.rel_path)
         q = self.db.Select('id', sets=FS_TABLE_NAME, where='path = ?')
@@ -107,15 +138,15 @@ class FSDBManager(object):
         if result:
             parent_id = result.id
 
-        q = self.db.Replace(FS_TABLE_NAME, 
-                            cols=['parent_id', 'type', 'name', 'size', 'create_time', 
+        q = self.db.Replace(FS_TABLE_NAME,
+                            cols=['parent_id', 'type', 'name', 'size', 'create_time',
                                   'modify_time', 'path'])
         size = fso.size if hasattr(fso, 'size') else 0
         type = DIR_TYPE if fso.is_dir() else FILE_TYPE
-        values = [parent_id, type, fso.name, size, fso.create_date, fso.modify_date, 
+        values = [parent_id, type, fso.name, size, fso.create_date, fso.modify_date,
                   fso.rel_path]
         self.db.execute(q, values)
-        
+
     def _clear_db(self):
         with self.db.transaction():
             q = self.db.Delete(FS_TABLE_NAME)
@@ -132,12 +163,12 @@ class FSDBManager(object):
         q = self.db.Select('op_time', sets=STATS_TABLE_NAME)
         self.db.query(q)
         op_time = self.db.result.op_time
-        # If the recorded op_time is greater than current time, assume system 
+        # If the recorded op_time is greater than current time, assume system
         # time was modified and revert to epoch time
         if op_time > time.time():
             op_time = 0.0
         return op_time
-    
+
     def _record_op_time(self):
         q = self.db.Update(STATS_TABLE_NAME, op_time=':op_time')
         self.db.query(q, op_time=time.time())
