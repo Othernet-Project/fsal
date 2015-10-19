@@ -69,10 +69,16 @@ class FSAL(object):
     def _send_request(self, message):
         if not message[-1] == '\0':
             message = message.encode(OUT_ENCODING) + '\0'
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.connect(self.socket_path)
-        sock.sendall(message)
-        return read_socket_stream(sock)
+        try:
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.connect(self.socket_path)
+            sock.sendall(message)
+            return read_socket_stream(sock)
+        except socket.error as err:
+            if sock:
+                sock.close()
+            sock = None
+            raise RuntimeError('FSAL could not connect to FSAL server')
 
     def _parse_list_dir_response(self, response_xml):
         success_node = response_xml.find('.//success')
