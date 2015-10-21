@@ -17,6 +17,7 @@ import shutil
 
 from .import commandtypes
 
+
 class CommandHandler(object):
     command_type = None
 
@@ -50,7 +51,8 @@ class DirectoryListingCommandHandler(CommandHandler):
                 dirs.append(fso)
             else:
                 files.append(fso)
-        params = {'base_path': self.fs_mgr.base_path, 'dirs': dirs, 'files': files}
+        params = {'base_path': self.fs_mgr.base_path, 'dirs': dirs,
+                  'files': files}
         return self.send_result(success=success, params=params)
 
 
@@ -70,8 +72,8 @@ class SearchCommandHandler(CommandHandler):
                 dirs.append(fso)
             else:
                 files.append(fso)
-        params = {'base_path': self.fs_mgr.base_path, 'dirs': dirs, 'files': files,
-                  'is_match': is_match}
+        params = {'base_path': self.fs_mgr.base_path, 'dirs': dirs,
+                  'files': files, 'is_match': is_match}
         return self.send_result(success=True, params=params)
 
 
