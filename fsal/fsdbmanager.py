@@ -16,16 +16,19 @@ FS_TABLE_NAME = 'fsentries'
 STATS_TABLE_NAME = 'dbmgr_stats'
 
 class FSDBManager(object):
-    def __init__(self, config, databases):
+    def __init__(self, config, context):
         self.base_path = os.path.abspath(config['fsal.basepath'])
         if not os.path.isdir(self.base_path):
             raise RuntimeError('Invalid basepath: "%s"'%(self.base_path))
 
-        self.db = databases.fs
+        self.db = context['databases'].fs
         self.last_op_time = self._read_last_op_time()
 
     def start(self):
         self.refresh_db()
+
+    def stop(self):
+        pass
 
     def is_valid_path(self, path):
         path = path.lstrip(os.sep)

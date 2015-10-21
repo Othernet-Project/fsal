@@ -22,9 +22,9 @@ class CommandHandler(object):
 
     is_synchronous = True
 
-    def __init__(self, command_data, fs_mgr):
+    def __init__(self, context, command_data):
         self.command_data = command_data
-        self.fs_mgr = fs_mgr
+        self.fs_mgr = context['fs_manager']
 
     def do_command(self):
         raise NotImplementedError()
@@ -159,16 +159,17 @@ class RemoveCommandHandler(CommandHandler):
 
 class CommandHandlerFactory(object):
 
-    def __init__(self):
+    def __init__(self, context):
+        self.context = context
         all_handlers = CommandHandler.__subclasses__()
         self.handler_map = dict((handler_cls.command_type, handler_cls)
                                 for handler_cls in all_handlers)
 
-    def create_handler(self, command_data, config):
+    def create_handler(self, command_data):
         command_type = command_data['type']
         try:
             handler_cls = self.handler_map[command_type]
         except KeyError:
             return None
         else:
-            return handler_cls(command_data, config)
+            return handler_cls(self.context, command_data)

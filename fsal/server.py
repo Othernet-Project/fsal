@@ -30,16 +30,10 @@ from .confloader import ConfDict
 from .handlers import CommandHandlerFactory
 from .responses import CommandResponseFactory
 from .fsdbmanager import FSDBManager
-from .db.databases import get_databases, apply_migrations
+from .db.databases import get_databases, apply_migrations, close_databases
 
-
-IN_ENCODING = 'ascii'
-OUT_ENCODING = 'utf-8'
 
 MODDIR = dirname(abspath(__file__))
-
-handler_factory = CommandHandlerFactory()
-response_factory = CommandResponseFactory()
 
 
 def in_pkg(*paths):
@@ -54,48 +48,38 @@ def consume_command_queue(command_queue):
         command_queue.task_done()
 
 
-def read_request(sock, buff_size=2048):
-    data = buff = sock.recv(buff_size)
-    while buff and '\0' not in buff:
-        buff = sock.recv(buff_size)
-        data += buffer
-    return data[:-1].decode(IN_ENCODING)
-
-
-def send_response(sock, response_data):
-    response = response_factory.create_response(response_data)
-    response_str = response.get_xml_str().encode(OUT_ENCODING)
-    if not response_str[-1] == '\0':
-        response_str += '\0'
-    sock.sendall(response_str)
-
-
-def parse_request(request_str):
-    return ET.fromstring(request_str)
-
-
 class FSALServer(object):
+    IN_ENCODING = 'ascii'
+    OUT_ENCODING = 'utf-8'
 
-    def __init__(self, config, fs_manager):
-        self._config = config
-        self._server = None
-        self._fs_manager = fs_manager
+    def __init__(self, config, context):
+        self.socket_path = config['fsal.socket']
+        self.server = None
+        self.handler_factory = CommandHandlerFactory(context)
+        self.response_factory = CommandResponseFactory()
 
     def run(self):
         with self.open_socket() as sock:
-            self._server = StreamServer(sock, self._request_handler)
-            self._server.serve_forever()
+            self.server = StreamServer(sock, self.request_handler)
+            self.server.serve_forever()
 
     def stop(self):
-        if self._server and self._server.started:
-            self._server.stop()
+        if self.server and self.server.started:
+            self.server.stop()
 
-    def _request_handler(self, sock, address):
-        request_data = xmltodict.parse(read_request(sock))['request']
+    def request_handler(self, sock, address):
+        request_data = xmltodict.parse(self.read_request(sock))['request']
         command_data = request_data['command']
-        handler = handler_factory.create_handler(command_data, self._fs_manager)
+        handler = self.handler_factory.create_handler(command_data)
         if handler.is_synchronous:
-            send_response(sock, handler.do_command())
+            self.send_response(sock, handler.do_command())
+
+    def send_response(self, sock, response_data):
+        response = self.response_factory.create_response(response_data)
+        response_str = response.get_xml_str().encode(FSALServer.OUT_ENCODING)
+        if not response_str[-1] == '\0':
+            response_str += '\0'
+        sock.sendall(response_str)
 
     def prepare_socket(self, path):
         try:
@@ -110,11 +94,29 @@ class FSALServer(object):
 
     @contextmanager
     def open_socket(self):
-        sock = self.prepare_socket(self._config['fsal.socket'])
+        sock = self.prepare_socket(self.socket_path)
         try:
             yield sock
         finally:
             sock.close()
+
+    @staticmethod
+    def read_request(sock, buff_size=2048):
+        data = buff = sock.recv(buff_size)
+        while buff and '\0' not in buff:
+            buff = sock.recv(buff_size)
+            data += buffer
+        return data[:-1].decode(FSALServer.IN_ENCODING)
+
+    @staticmethod
+    def parse_request(request_str):
+        return ET.fromstring(request_str)
+
+
+def cleanup(context):
+    context['fs_manager'].stop()
+    context['server'].stop()
+    close_databases(context['databases'])
 
 
 def main():
@@ -131,22 +133,29 @@ def main():
 
     logging.basicConfig(level=logging.DEBUG)
 
-    databases = get_databases(config)
-    apply_migrations(config, databases)
+    context = dict()
+    context['config'] = config
+    context['databases'] = get_databases(config)
+    apply_migrations(config, context)
 
-    fs_manager = FSDBManager(config, databases)
+    fs_manager = FSDBManager(config, context)
     fs_manager.start()
+    context['fs_manager'] = fs_manager
 
-    server = FSALServer(config, fs_manager)
+    server = FSALServer(config, context)
+    context['server'] = server
 
-    signal.signal(signal.SIGINT, lambda *a, **k: server.stop())
-    signal.signal(signal.SIGTERM, lambda *a, **k: server.stop())
+    def cleanup_wrapper(*args):
+        cleanup(context)
+
+    signal.signal(signal.SIGINT, cleanup_wrapper)
+    signal.signal(signal.SIGTERM, cleanup_wrapper)
 
     try:
         server.run()
     except KeyboardInterrupt:
-        print('Keyboard interrupt received')
-    server.stop()
+        logging.info('Keyboard interrupt received. Shutting down.')
+        cleanup(context)
 
 if __name__ == '__main__':
     main()

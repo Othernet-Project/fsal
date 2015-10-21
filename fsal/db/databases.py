@@ -41,8 +41,8 @@ def get_databases(config):
     return squery.get_databases(database_configs)
 
 
-def apply_migrations(config, databases):
-    for db_name, db in databases.items():
+def apply_migrations(config, context):
+    for db_name, db in context['databases'].items():
         migrate(db,
                 'fsal.migrations.{0}'.format(db_name),
                 config)
