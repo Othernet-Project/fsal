@@ -8,6 +8,8 @@ from xml.etree.ElementTree import Element, SubElement, tostring
 
 from . import commandtypes
 from .fs import File, Directory
+from .serialize import str_to_bool, bool_to_str
+
 
 IN_ENCODING = 'utf-8'
 OUT_ENCODING = 'utf-8'
@@ -32,9 +34,6 @@ def read_socket_stream(sock, buff_size=2048):
         data += buff
     return data[:-1].decode(IN_ENCODING)
 
-
-def str_to_bool(s):
-    return str(s).lower() == "true"
 
 
 def command(command_type, response_parser):
@@ -151,5 +150,6 @@ class FSAL(object):
         return {'path': path}
 
     @command(commandtypes.COMMAND_TYPE_SEARCH, _parse_search_response)
-    def search(self, query):
-        return {'query': query}
+    def search(self, query, whole_words=False):
+        return {'query': query,
+                'whole_words': bool_to_str(whole_words)}

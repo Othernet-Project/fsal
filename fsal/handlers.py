@@ -19,6 +19,7 @@ import scandir
 
 from .import commandtypes
 from .fs import File, Directory
+from .serialize import str_to_bool
 
 
 def fnwalk(path, fn, shallow=False):
@@ -136,11 +137,17 @@ class SearchCommandHandler(CommandHandler):
         else:
             is_match = False
             keywords = [k.lower() for k in query.split()]
-
+            whole_words = str_to_bool(self.command_data['params']['whole_words'])
             def path_checker(path):
+                def cmp(keyword, name):
+                    if whole_words:
+                        return (keyword == name)
+                    else:
+                        return (keyword in name)
+
                 tmp, name = os.path.split(path)
-                name = name.lower()
-                return any(k in name for k in keywords)
+                name = name if whole_words else name.lower()
+                return any(cmp(k, name) for k in keywords)
 
             for path in fnwalk(self.base_path, path_checker):
                 rel_path = os.path.relpath(path,self.base_path)
