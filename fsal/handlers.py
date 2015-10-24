@@ -61,9 +61,6 @@ class SearchCommandHandler(CommandHandler):
 
     def do_command(self):
         query = self.command_data['params']['query']
-        if(query[0] == '/'):
-            query = query[1:]
-        is_match = False
         is_match, fs_objs = self.fs_mgr.search(query)
         dirs = []
         files = []

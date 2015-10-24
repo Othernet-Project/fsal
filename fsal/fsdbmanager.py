@@ -14,98 +14,98 @@ class FSDBManager(object):
     FS_TABLE = 'fsentries'
     STATS_TABLE = 'dbmgr_stats'
 
-    def __init__(self, config, context):
-        self.base_path = os.path.abspath(config['fsal.basepath'])
-        if not os.path.isdir(self.base_path):
-            raise RuntimeError('Invalid basepath: "%s"' % (self.base_path))
+    ROOT_DIR_PATHS = ('.', os.sep)
 
+    def __init__(self, config, context):
+        base_path = os.path.abspath(config['fsal.basepath'])
+        if not os.path.isdir(base_path):
+            raise RuntimeError('Invalid basepath: "%s"' % (base_path))
+
+        self.base_path = base_path
         self.db = context['databases'].fs
         self.last_op_time = self._read_last_op_time()
+        self._root_dir = None
 
     def start(self):
-        self.refresh_db()
+        self._refresh_db()
 
     def stop(self):
         pass
 
-    def is_valid_path(self, path):
+    @property
+    def root_dir(self):
+        if self._root_dir is None:
+            self._root_dir = Directory.from_path(self.base_path, '.')
+            self._root_dir.id = 0
+        return self._root_dir
+
+    def list_dir(self, path):
+        d = self._get_dir(path)
+        if d is None:
+            return (False, [])
+        else:
+            q = self.db.Select('*', sets=self.FS_TABLE, where='parent_id = ?')
+            cursor = self.db.query(q, d.id)
+            return (True, self._fso_row_iterator(cursor))
+
+    def search(self, query):
+        #TODO: Add support for whole_words
+        success, files = self.list_dir(query)
+        if success:
+            return (success, files)
+        else:
+            keywords = ["%%%s%%" % k for k in query.split()]
+            q = self.db.Select('*', sets=self.FS_TABLE)
+            for _ in keywords:
+                q.where |= 'name LIKE ?'
+            self.db.execute(q, keywords)
+            return (False, self._fso_row_iterator(self.db.cursor))
+
+    def exists(self, path):
+        return (self.get_fso(path) is not None)
+
+    def is_dir(self, path):
+        return (self.get_fso(path).is_dir())
+
+    def is_file(self, path):
+        return (self.get_fso(path).is_file())
+
+    def _is_valid_path(self, path):
         path = path.lstrip(os.sep)
         full_path = os.path.abspath(os.path.join(self.base_path, path))
         return full_path.startswith(self.base_path)
 
-    def list_dir(self, path):
-        if not self.is_valid_path(path):
-            return (False, [])
+    def _get_fso(self, path):
+        if not self._is_valid_path(path):
+            return None
 
-        if path == '.':
-            parent_id = 0
+        if path in self.ROOT_DIR_PATHS:
+            return self.root_dir
         else:
-            q = self.db.Select('id', sets=self.FS_TABLE, where='path = ?')
+            q = self.db.Select('*', sets=self.FS_TABLE, where='path = ?')
             self.db.query(q, path)
             result = self.db.result
-            if not result:
-                return (False, [])
+            if result:
+                return self._make_fso(result)
             else:
-                parent_id = result.id
+                return None
 
-        q = self.db.Select('*', sets=self.FS_TABLE, where='parent_id = ?')
-        cursor = self.db.query(q, parent_id)
-        return (True, self._fso_row_iterator(cursor))
+    def _make_fso(self, row):
+        type = row.type
+        cls = Directory if type == self.DIR_TYPE else File
+        fso = cls.from_db_row(self.base_path, row)
+        fso._id = row.id
+        return fso
 
-    def search(self, query):
-        if self.is_valid_path(query):
-            success, files = self.list_dir(query)
-            if success:
-                return (success, files)
+    def _get_dir(self, path):
+        fso = self._get_fso(path)
+        return fso if fso.is_dir() else None
 
-        keywords = ["%%%s%%" % k for k in query.split()]
-        q = self.db.Select('*', sets=self.FS_TABLE)
-        for _ in keywords:
-            q.where |= 'name LIKE ?'
+    def _refresh_db(self):
+        self._prune_db()
+        self._update_db()
 
-        self.db.execute(q, keywords)
-        return (False, self._fso_row_iterator(self.db.cursor))
-
-    def exists(self, path):
-        if not self.is_valid_path(path):
-            return False
-        if path in (os.sep, os.curdir):
-            return True
-        else:
-            q = self.db.Select('id', sets=self.FS_TABLE, where='path = ?',
-                               limit=1)
-            self.db.query(q, path)
-            return self.db.result is not None
-
-    def is_dir(self, path):
-        if not self.is_valid_path(path):
-            return False
-        if path in (os.sep, os.curdir):
-            return True
-        else:
-            q = self.db.Select('type', sets=self.FS_TABLE, where='path = ?',
-                               limit=1)
-            self.db.query(q, path)
-            result = self.db.result
-            return (result and result.type == self.DIR_TYPE)
-
-    def is_file(self, path):
-        if not self.is_valid_path(path):
-            return False
-        if path in (os.sep, os.curdir):
-            return True
-        else:
-            q = self.db.Select('type', sets=self.FS_TABLE, where='path = ?',
-                               limit=1)
-            self.db.query(q, path)
-            result = self.db.result
-            return (result and result.type == self.FILE_TYPE)
-
-    def refresh_db(self):
-        self.prune_db()
-        self.update_db()
-
-    def prune_db(self):
+    def _prune_db(self, batch_size=1000):
         with self.db.transaction():
             q = self.db.Select('path', sets=self.FS_TABLE)
             for result in self.db.query(q):
@@ -116,7 +116,7 @@ class FSDBManager(object):
                     self.db.query(q2, path)
                     logging.debug("Removing db entry for %s" % path)
 
-    def update_db(self):
+    def _update_db(self):
         def checker(path):
             return (path != self.base_path and
                     os.path.getmtime(path) > self.last_op_time)
@@ -129,10 +129,10 @@ class FSDBManager(object):
                     fso = Directory.from_path(self.base_path, rel_path)
                 else:
                     fso = File.from_path(self.base_path, rel_path)
-                self.update_entry(fso)
+                self._update_entry(fso)
         self._record_op_time()
 
-    def update_entry(self, fso):
+    def _update_entry(self, fso):
         parent, name = os.path.split(fso.rel_path)
         q = self.db.Select('id', sets=self.FS_TABLE, where='path = ?')
         self.db.query(q, parent)
@@ -157,9 +157,7 @@ class FSDBManager(object):
 
     def _fso_row_iterator(self, cursor):
         for result in cursor:
-            type = result.type
-            cls = Directory if type == self.DIR_TYPE else File
-            yield cls.from_db_row(self.base_path, result)
+            yield self._make_fso(result)
 
     def _read_last_op_time(self):
         q = self.db.Select('op_time', sets=self.STATS_TABLE)

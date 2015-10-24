@@ -35,6 +35,8 @@ class FSObject(object):
     def is_dir(self):
         return False
 
+    def is_file(self):
+        return False
 
 class File(FSObject):
 
@@ -42,6 +44,9 @@ class File(FSObject):
         super(File, self).__init__(base_path, rel_path, create_date,
                                    modify_date)
         self._size = size
+
+    def is_file(self):
+        return True
 
     @property
     def size(self):
