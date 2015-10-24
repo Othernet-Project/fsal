@@ -162,15 +162,15 @@ class FSDBManager(object):
             yield cls.from_db_row(self.base_path, result)
 
     def _read_last_op_time(self):
-        q = self.db.Select('op_time', sets=self.STAT_TABLE)
+        q = self.db.Select('op_time', sets=self.STATS_TABLE)
         self.db.query(q)
         op_time = self.db.result.op_time
-        # If the recorded op_time is greater than current time, assume system
-        # time was modified and revert to epoch time
+        # If the recorded op_time is greater than current time, assume
+        # system time was modified and revert to epoch time
         if op_time > time.time():
             op_time = 0.0
         return op_time
 
     def _record_op_time(self):
-        q = self.db.Update(self.STAT_TABLE, op_time=':op_time')
+        q = self.db.Update(self.STATS_TABLE, op_time=':op_time')
         self.db.query(q, op_time=time.time())
