@@ -1,11 +1,14 @@
 import os
 import shutil
 import logging
+import time
 
 from .utils import fnwalk
 from .fs import File, Directory
-
-import time
+try:
+    from functools import lru_cache
+except:
+    from .utils import lru_cache
 
 
 class FSDBManager(object):
@@ -84,6 +87,7 @@ class FSDBManager(object):
         full_path = os.path.abspath(os.path.join(self.base_path, path))
         return full_path.startswith(self.base_path)
 
+    @lru_cache(maxsize=100)
     def _get_fso(self, path):
         if not self._is_valid_path(path):
             return None
@@ -161,7 +165,7 @@ class FSDBManager(object):
         with self.db.transaction():
             for path in fnwalk(self.base_path, checker):
                 rel_path = os.path.relpath(path, self.base_path)
-                logging.debug("Updating db entry for %s" % rel_path)
+                #logging.debug("Updating db entry for %s" % rel_path)
                 if os.path.isdir(path):
                     fso = Directory.from_path(self.base_path, rel_path)
                 else:
@@ -171,10 +175,8 @@ class FSDBManager(object):
 
     def _update_fso_entry(self, fso):
         parent, name = os.path.split(fso.rel_path)
-        q = self.db.Select('id', sets=self.FS_TABLE, where='path = ?')
-        self.db.query(q, parent)
-        result = self.db.result
-        parent_id = result.id if result else 0
+        parent_dir = self._get_dir(parent)
+        parent_id = parent_dir.__id if parent_dir else 0
 
         cols = ['parent_id', 'type', 'name', 'size', 'create_time',
                 'modify_time', 'path']
