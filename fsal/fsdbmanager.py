@@ -1,4 +1,5 @@
 import os
+import shutil
 import logging
 
 from .utils import fnwalk
@@ -72,6 +73,13 @@ class FSDBManager(object):
         fso = self.get_fso(path)
         return (fso is not None and fso.is_file())
 
+    def remove(self, path):
+        fso = self._get_fso(path)
+        if fso is None:
+            return (False, 'No such file or directory "%s"' % path)
+        else:
+            return self._remove_fso(fso)
+
     def _is_valid_path(self, path):
         if path is None:
             return False
@@ -100,6 +108,20 @@ class FSDBManager(object):
         fso = cls.from_db_row(self.base_path, row)
         fso._id = row.id
         return fso
+
+    def _remove_fso(self, fso):
+        remover = shutil.rmtree if fso.is_dir() else os.remove
+        try:
+            remover(fso.path)
+            q = self.db.Delete(self.FS_TABLE, where = 'path LIKE ?')
+            self.db.execute(q, ('%s%%'%(fso.rel_path),))
+            logging.debug("Removing %d files/folders" %(self.db.cursor.rowcount))
+        except Exception as e:
+            #FIXME: Handle error more gracefully
+            self._refresh_db()
+            return (False, str(e))
+        else:
+            return (True, None)
 
     def _get_dir(self, path):
         fso = self._get_fso(path)

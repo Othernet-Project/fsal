@@ -133,27 +133,11 @@ class IsFileCommandHandler(CommandHandler):
 class RemoveCommandHandler(CommandHandler):
     command_type = commandtypes.COMMAND_TYPE_REMOVE
 
-    def __removal(self, removal_func, path):
-        base_path = self.config['fsal.basepath']
-        try:
-            removal_func(path)
-        except Exception as exc:
-            params = {'base_path': base_path, 'error': str(exc)}
-            return self.send_result(success=False, params=params)
-        else:
-            params = {'base_path': base_path, 'error': None}
-            return self.send_result(success=True, params=params)
-
     def do_command(self):
         path = self.command_data['params']['path']
-        base_path = self.config['fsal.basepath']
-        full_path = os.path.join(base_path, path)
-        if not os.path.exists(full_path):
-            params = {'base_path': base_path, 'error': 'does_not_exist'}
-            return self.send_result(success=False, params=params)
-
-        remover = shutil.rmtree if os.path.isdir(full_path) else os.remove
-        return self.__removal(remover, full_path)
+        success, msg = self.fs_mgr.remove(path)
+        params = {'error': msg}
+        return self.send_result(success=success, params=params)
 
 
 class CommandHandlerFactory(object):
