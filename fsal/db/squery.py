@@ -172,6 +172,11 @@ class Database(object):
             self._cursor = self.conn.cursor()
         return self._cursor
 
+    def drop_cursor(self):
+        cur = self._cursor
+        self._cursor = None
+        return cur
+
     @property
     def results(self):
         return self.cursor.fetchall()

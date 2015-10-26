@@ -128,21 +128,32 @@ class FSDBManager(object):
         return fso if fso and fso.is_dir() else None
 
     def _refresh_db(self):
+        start = time.time()
         self._prune_db()
         self._update_db()
+        end = time.time()
+        logging.debug('DB refreshed in %0.3f ms' %((end - start) * 1000))
+
+    def _remove_paths(self, paths):
+        q = self.db.Delete(self.FS_TABLE, where='path = ?')
+        self.db.executemany(q, ((p,) for p in paths))
 
     def _prune_db(self, batch_size=1000):
         with self.db.transaction():
             q = self.db.Select('path', sets=self.FS_TABLE)
-            #FIXME: Batch the results and delete selectively
-            results = self.db.query(q).fetchall()
-            for result in results:
+            self.db.query(q)
+            cursor = self.db.drop_cursor()
+            removed_paths = []
+            for result in cursor:
                 path = result.path
                 full_path = os.path.join(self.base_path, path)
                 if not os.path.exists(full_path):
-                    q2 = self.db.Delete(self.FS_TABLE, where='path = ?')
-                    self.db.query(q2, path)
-                    logging.debug("Removing db entry for %s" % path)
+                    removed_paths.append(path)
+                if len(removed_paths) >= batch_size:
+                    self._remove_paths(removed_paths)
+                    removed_paths = []
+            if len(removed_paths) >= 0:
+                self._remove_paths(removed_paths)
 
     def _update_db(self):
         def checker(path):
