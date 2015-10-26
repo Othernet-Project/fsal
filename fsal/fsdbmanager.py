@@ -116,6 +116,7 @@ class FSDBManager(object):
             q = self.db.Delete(self.FS_TABLE, where = 'path LIKE ?')
             self.db.execute(q, ('%s%%'%(fso.rel_path),))
             logging.debug("Removing %d files/folders" %(self.db.cursor.rowcount))
+            self._record_op_time()
         except Exception as e:
             #FIXME: Handle error more gracefully
             self._refresh_db()
@@ -209,5 +210,6 @@ class FSDBManager(object):
         return op_time
 
     def _record_op_time(self):
+        self.last_op_time = time.time()
         q = self.db.Update(self.STATS_TABLE, op_time=':op_time')
-        self.db.query(q, op_time=time.time())
+        self.db.query(q, op_time=self.last_op_time)
