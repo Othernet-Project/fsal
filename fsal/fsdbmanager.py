@@ -65,12 +65,16 @@ class FSDBManager(object):
         return (self.get_fso(path) is not None)
 
     def is_dir(self, path):
-        return (self.get_fso(path).is_dir())
+        fso = self.get_fso(path)
+        return (fso is not None and fso.is_dir())
 
     def is_file(self, path):
-        return (self.get_fso(path).is_file())
+        fso = self.get_fso(path)
+        return (fso is not None and fso.is_file())
 
     def _is_valid_path(self, path):
+        if path is None:
+            return False
         path = path.lstrip(os.sep)
         full_path = os.path.abspath(os.path.join(self.base_path, path))
         return full_path.startswith(self.base_path)
@@ -99,7 +103,7 @@ class FSDBManager(object):
 
     def _get_dir(self, path):
         fso = self._get_fso(path)
-        return fso if fso.is_dir() else None
+        return fso if fso and fso.is_dir() else None
 
     def _refresh_db(self):
         self._prune_db()
