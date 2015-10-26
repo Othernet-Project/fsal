@@ -108,7 +108,9 @@ class FSDBManager(object):
     def _prune_db(self, batch_size=1000):
         with self.db.transaction():
             q = self.db.Select('path', sets=self.FS_TABLE)
-            for result in self.db.query(q):
+            #FIXME: Batch the results and delete selectively
+            results = self.db.query(q).fetchall()
+            for result in results:
                 path = result.path
                 full_path = os.path.join(self.base_path, path)
                 if not os.path.exists(full_path):
