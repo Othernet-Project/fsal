@@ -63,7 +63,7 @@ class FSDBManager(object):
             return (False, self._fso_row_iterator(self.db.cursor))
 
     def exists(self, path):
-        return (self._get_fso(path) is not None)
+        return (self.get_fso(path) is not None)
 
     def is_dir(self, path):
         fso = self._get_dir(path)
@@ -73,8 +73,20 @@ class FSDBManager(object):
         fso = self._get_file(path)
         return (fso is not None)
 
+    @lru_cache(maxsize=100)
+    def get_fso(self, path):
+        if not self._is_valid_path(path):
+            return None
+        if path in self.ROOT_DIR_PATHS:
+            return self.get_root_dir()
+        else:
+            q = self.db.Select('*', sets=self.FS_TABLE, where='path = ?')
+            self.db.query(q, path)
+            result = self.db.result
+            return self._construct_fso(result) if result else None
+
     def remove(self, path):
-        fso = self._get_fso(path)
+        fso = self.get_fso(path)
         if fso is None:
             return (False, 'No such file or directory "%s"' % path)
         else:
@@ -86,18 +98,6 @@ class FSDBManager(object):
         path = path.lstrip(os.sep)
         full_path = os.path.abspath(os.path.join(self.base_path, path))
         return full_path.startswith(self.base_path)
-
-    @lru_cache(maxsize=100)
-    def _get_fso(self, path):
-        if not self._is_valid_path(path):
-            return None
-        if path in self.ROOT_DIR_PATHS:
-            return self.get_root_dir()
-        else:
-            q = self.db.Select('*', sets=self.FS_TABLE, where='path = ?')
-            self.db.query(q, path)
-            result = self.db.result
-            return self._construct_fso(result) if result else None
 
     def _construct_fso(self, row):
         type = row.type
@@ -122,11 +122,11 @@ class FSDBManager(object):
             return (True, None)
 
     def _get_dir(self, path):
-        fso = self._get_fso(path)
+        fso = self.get_fso(path)
         return fso if fso and fso.is_dir() else None
 
     def _get_file(self, path):
-        fso = self._get_fso(path)
+        fso = self.get_fso(path)
         return fso if fso and fso.is_file() else None
 
     def _refresh_db(self):

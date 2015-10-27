@@ -57,6 +57,28 @@ class GenericResponse:
         return tostring(self.get_xml())
 
 
+def add_dir_node(parent_node, fso):
+    dir_node = SubElement(parent_node, 'dir')
+    rel_path_node = SubElement(dir_node, 'rel-path')
+    rel_path_node.text = fso.rel_path
+    create_timestamp_node = SubElement(dir_node, 'create-timestamp')
+    create_timestamp_node.text = str(to_timestamp(fso.create_date))
+    modify_timestamp_node = SubElement(dir_node, 'modify-timestamp')
+    modify_timestamp_node.text = str(to_timestamp(fso.modify_date))
+
+
+def add_file_node(parent_node, fso):
+    file_node = SubElement(parent_node, 'file')
+    rel_path_node = SubElement(file_node, 'rel-path')
+    rel_path_node.text = fso.rel_path
+    size_node = SubElement(file_node, 'size')
+    size_node.text = str(fso.size)
+    create_timestamp_node = SubElement(file_node, 'create-timestamp')
+    create_timestamp_node.text = str(to_timestamp(fso.create_date))
+    modify_timestamp_node = SubElement(file_node, 'modify-timestamp')
+    modify_timestamp_node.text = str(to_timestamp(fso.modify_date))
+
+
 class DirectoryListingResponse:
     def __init__(self, response_data):
         self.response_data = response_data
@@ -65,33 +87,35 @@ class DirectoryListingResponse:
         root = create_response_xml_root()
         result_node = SubElement(root, 'result')
         success_node = SubElement(result_node, 'success')
-        success_node.text = str(self.response_data['success']).lower()
-        params_node = SubElement(result_node, 'params')
+        success = self.response_data['success']
+        success_node.text = str(success).lower()
+        if success:
+            params_node = SubElement(result_node, 'params')
 
-        base_path_node = SubElement(params_node, 'base-path')
-        base_path_node.text = self.response_data['params']['base_path']
+            base_path_node = SubElement(params_node, 'base-path')
+            base_path_node.text = self.response_data['params']['base_path']
 
-        dirs_node = SubElement(params_node, 'dirs')
-        for d in self.response_data['params']['dirs']:
-            dir_node = SubElement(dirs_node, 'dir')
-            rel_path_node = SubElement(dir_node, 'rel-path')
-            rel_path_node.text = d.rel_path
-            create_timestamp_node = SubElement(dir_node, 'create-timestamp')
-            create_timestamp_node.text = str(to_timestamp(d.create_date))
-            modify_timestamp_node = SubElement(dir_node, 'modify-timestamp')
-            modify_timestamp_node.text = str(to_timestamp(d.modify_date))
+            dirs_node = SubElement(params_node, 'dirs')
+            for d in self.response_data['params']['dirs']:
+                dir_node = SubElement(dirs_node, 'dir')
+                rel_path_node = SubElement(dir_node, 'rel-path')
+                rel_path_node.text = d.rel_path
+                create_timestamp_node = SubElement(dir_node, 'create-timestamp')
+                create_timestamp_node.text = str(to_timestamp(d.create_date))
+                modify_timestamp_node = SubElement(dir_node, 'modify-timestamp')
+                modify_timestamp_node.text = str(to_timestamp(d.modify_date))
 
-        files_node = SubElement(params_node, 'files')
-        for f in self.response_data['params']['files']:
-            file_node = SubElement(files_node, 'file')
-            rel_path_node = SubElement(file_node, 'rel-path')
-            rel_path_node.text = f.rel_path
-            size_node = SubElement(file_node, 'size')
-            size_node.text = str(f.size)
-            create_timestamp_node = SubElement(file_node, 'create-timestamp')
-            create_timestamp_node.text = str(to_timestamp(f.create_date))
-            modify_timestamp_node = SubElement(file_node, 'modify-timestamp')
-            modify_timestamp_node.text = str(to_timestamp(f.modify_date))
+            files_node = SubElement(params_node, 'files')
+            for f in self.response_data['params']['files']:
+                file_node = SubElement(files_node, 'file')
+                rel_path_node = SubElement(file_node, 'rel-path')
+                rel_path_node.text = f.rel_path
+                size_node = SubElement(file_node, 'size')
+                size_node.text = str(f.size)
+                create_timestamp_node = SubElement(file_node, 'create-timestamp')
+                create_timestamp_node.text = str(to_timestamp(f.create_date))
+                modify_timestamp_node = SubElement(file_node, 'modify-timestamp')
+                modify_timestamp_node.text = str(to_timestamp(f.modify_date))
 
         return root
 
@@ -107,36 +131,64 @@ class SearchResponse:
         root = create_response_xml_root()
         result_node = SubElement(root, 'result')
         success_node = SubElement(result_node, 'success')
-        success_node.text = str(self.response_data['success']).lower()
-        params_node = SubElement(result_node, 'params')
+        success = self.response_data['success']
+        success_node.text = str(success).lower()
+        if success:
+            params_node = SubElement(result_node, 'params')
 
-        base_path_node = SubElement(params_node, 'base-path')
-        base_path_node.text = self.response_data['params']['base_path']
+            base_path_node = SubElement(params_node, 'base-path')
+            base_path_node.text = self.response_data['params']['base_path']
 
-        is_match_node = SubElement(params_node, 'is-match')
-        is_match_node.text = str(self.response_data['params']['is_match']).lower()
+            is_match_node = SubElement(params_node, 'is-match')
+            is_match_node.text = str(self.response_data['params']['is_match']).lower()
 
-        dirs_node = SubElement(params_node, 'dirs')
-        for d in self.response_data['params']['dirs']:
-            dir_node = SubElement(dirs_node, 'dir')
-            rel_path_node = SubElement(dir_node, 'rel-path')
-            rel_path_node.text = d.rel_path
-            create_timestamp_node = SubElement(dir_node, 'create-timestamp')
-            create_timestamp_node.text = str(to_timestamp(d.create_date))
-            modify_timestamp_node = SubElement(dir_node, 'modify-timestamp')
-            modify_timestamp_node.text = str(to_timestamp(d.modify_date))
+            dirs_node = SubElement(params_node, 'dirs')
+            for d in self.response_data['params']['dirs']:
+                dir_node = SubElement(dirs_node, 'dir')
+                rel_path_node = SubElement(dir_node, 'rel-path')
+                rel_path_node.text = d.rel_path
+                create_timestamp_node = SubElement(dir_node, 'create-timestamp')
+                create_timestamp_node.text = str(to_timestamp(d.create_date))
+                modify_timestamp_node = SubElement(dir_node, 'modify-timestamp')
+                modify_timestamp_node.text = str(to_timestamp(d.modify_date))
 
-        files_node = SubElement(params_node, 'files')
-        for f in self.response_data['params']['files']:
-            file_node = SubElement(files_node, 'file')
-            rel_path_node = SubElement(file_node, 'rel-path')
-            rel_path_node.text = f.rel_path
-            size_node = SubElement(file_node, 'size')
-            size_node.text = str(f.size)
-            create_timestamp_node = SubElement(file_node, 'create-timestamp')
-            create_timestamp_node.text = str(to_timestamp(f.create_date))
-            modify_timestamp_node = SubElement(file_node, 'modify-timestamp')
-            modify_timestamp_node.text = str(to_timestamp(f.modify_date))
+            files_node = SubElement(params_node, 'files')
+            for f in self.response_data['params']['files']:
+                file_node = SubElement(files_node, 'file')
+                rel_path_node = SubElement(file_node, 'rel-path')
+                rel_path_node.text = f.rel_path
+                size_node = SubElement(file_node, 'size')
+                size_node.text = str(f.size)
+                create_timestamp_node = SubElement(file_node, 'create-timestamp')
+                create_timestamp_node.text = str(to_timestamp(f.create_date))
+                modify_timestamp_node = SubElement(file_node, 'modify-timestamp')
+                modify_timestamp_node.text = str(to_timestamp(f.modify_date))
+
+        return root
+
+    def get_xml_str(self):
+        return tostring(self.get_xml())
+
+
+class GetFSOResponse:
+    def __init__(self, response_data):
+        self.response_data = response_data
+
+    def get_xml(self):
+        root = create_response_xml_root()
+        result_node = SubElement(root, 'result')
+        success_node = SubElement(result_node, 'success')
+        success = self.response_data['success']
+        success_node.text = str(success).lower()
+        if success:
+            params = self.response_data['params']
+            params_node = SubElement(result_node, 'params')
+            base_path_node = SubElement(params_node, 'base-path')
+            base_path_node.text = params['base_path']
+            if 'dir' in params:
+                add_dir_node(params_node, params['dir'])
+            else:
+                add_file_node(params_node, params['file'])
 
         return root
 
@@ -148,7 +200,8 @@ class CommandResponseFactory:
     default_response_generator = GenericResponse
     response_map = {
         commandtypes.COMMAND_TYPE_LIST_DIR: DirectoryListingResponse,
-        commandtypes.COMMAND_TYPE_SEARCH: SearchResponse
+        commandtypes.COMMAND_TYPE_SEARCH: SearchResponse,
+        commandtypes.COMMAND_TYPE_GET_FSO: GetFSOResponse,
     }
 
     def create_response(self, response_data):

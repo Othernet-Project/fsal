@@ -88,6 +88,10 @@ class Directory(FSObject):
         path.lstrip(os.sep)
         return os.path.normpath(os.path.join(self.rel_path, path))
 
+    @property
+    def size(self):
+        return 0  # TODO: implement me
+
     @classmethod
     def from_xml(cls, base_path, file_xml):
         rel_path = file_xml.find('rel-path').text

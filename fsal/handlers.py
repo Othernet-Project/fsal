@@ -16,6 +16,13 @@ import os
 import shutil
 
 from .import commandtypes
+from .fs import File, Directory
+
+
+def validate_path(base_path, path):
+    path = path.lstrip(os.sep)
+    full_path = os.path.abspath(os.path.join(base_path, path))
+    return full_path.startswith(base_path), full_path
 
 
 class CommandHandler(object):
@@ -41,8 +48,6 @@ class DirectoryListingCommandHandler(CommandHandler):
 
     def do_command(self):
         path = self.command_data['params']['path']
-        if(path[0] == '/'):
-            path = path[1:]
         success, fs_objs = self.fs_mgr.list_dir(path)
         dirs = []
         files = []
@@ -53,6 +58,7 @@ class DirectoryListingCommandHandler(CommandHandler):
                 files.append(fso)
         params = {'base_path': self.fs_mgr.base_path, 'dirs': dirs,
                   'files': files}
+
         return self.send_result(success=success, params=params)
 
 
@@ -71,6 +77,7 @@ class SearchCommandHandler(CommandHandler):
                 files.append(fso)
         params = {'base_path': self.fs_mgr.base_path, 'dirs': dirs,
                   'files': files, 'is_match': is_match}
+
         return self.send_result(success=True, params=params)
 
 
@@ -82,6 +89,10 @@ class CopyCommandHandler(CommandHandler):
     def do_command(self):
         source_path = self.command_data['params']['source']
         dest_path = self.command_data['params']['dest']
+        source_valid, source_path = validate_path(self.base_path, source_path)
+        dest_valid, dest_path = validate_path(self.base_path, dest_path)
+        if not (source_valid and dest_valid):
+            return
         try:
             if os.path.isdir(source_path):
                 shutil.copytree(source_path, dest_path)
@@ -137,6 +148,23 @@ class RemoveCommandHandler(CommandHandler):
         path = self.command_data['params']['path']
         success, msg = self.fs_mgr.remove(path)
         params = {'error': msg}
+        return self.send_result(success=success, params=params)
+
+
+class GetFSOCommandHandler(CommandHandler):
+    command_type = commandtypes.COMMAND_TYPE_GET_FSO
+
+    def do_command(self):
+        path = self.command_data['params']['path']
+        fso = self.fs_mgr.get_fso(path)
+        success = fso is not None
+        if success:
+            params = {'base_path': self.fs_mgr.base_path}
+            key = 'dir' if fso.is_dir() else 'file'
+            params[key] = fso
+        else:
+            params = {'error': 'does_not_exist'}
+
         return self.send_result(success=success, params=params)
 
 
