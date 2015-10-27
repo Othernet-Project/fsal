@@ -239,6 +239,26 @@ class RemoveCommandHandler(CommandHandler):
         return self.__removal(remover, full_path)
 
 
+class GetFSOCommandHandler(CommandHandler):
+    command_type = commandtypes.COMMAND_TYPE_GET_FSO
+
+    def do_command(self):
+        path = self.command_data['params']['path']
+        is_valid, full_path = validate_path(self.base_path, path)
+        exists = os.path.exists(full_path)
+        success = is_valid and exists
+        if success:
+            params = {'base_path': self.base_path}
+            if os.path.isdir(full_path):
+                params['dir'] = Directory.from_path(self.base_path, path)
+            else:
+                params['file'] = File.from_path(self.base_path, path)
+        else:
+            params = {'error': 'does_not_exist'}
+
+        return self.send_result(success=success, params=params)
+
+
 class CommandHandlerFactory(object):
 
     def __init__(self):
