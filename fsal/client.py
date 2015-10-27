@@ -129,6 +129,22 @@ class FSAL(object):
         is_match = success and str_to_bool(response_xml.find('.//is-match').text)
         return (dirs, files, is_match)
 
+    def _parse_get_fso_response(self, response_xml):
+        success_node = response_xml.find('.//success')
+        success = str_to_bool(success_node.text)
+        if success:
+            base_path = response_xml.find('.//base-path').text
+            dir_node = response_xml.find('.//dir')
+            if dir_node is not None:
+                return (success, Directory.from_xml(base_path, dir_node))
+
+            file_node = response_xml.find('.//file')
+            return (success, File.from_xml(base_path, file_node))
+
+        error_node = response_xml.find('.//error')
+        error = error_node.text
+        return (success, error)
+
     @command(commandtypes.COMMAND_TYPE_LIST_DIR, _parse_list_dir_response)
     def list_dir(self, path):
         return {'path': path}
@@ -153,3 +169,7 @@ class FSAL(object):
     def search(self, query, whole_words=False):
         return {'query': query,
                 'whole_words': bool_to_str(whole_words)}
+
+    @command(commandtypes.COMMAND_TYPE_GET_FSO, _parse_get_fso_response)
+    def get_fso(self, path):
+        return {'path': path}
