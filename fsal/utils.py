@@ -20,3 +20,20 @@ def to_unicode(v, encoding='utf8'):
         return v.decode(encoding)
     except (AttributeError, UnicodeEncodeError):
         return unicode(v)
+
+
+def to_bytes(v, encoding='utf8'):
+    """
+    Convert a value to bytestring (or just string in Py2). This function is
+    useful when desired output is always a bytestring, and input can be any
+    type (although it is intended to be used with strings and bytestrings).
+
+    The ``encoding`` argument is used to specify the encoding of the resulting
+    bytestring.
+    """
+    if isinstance(v, bytes):
+        return v
+    try:
+        return v.encode(encoding, errors='ignore')
+    except AttributeError:
+        return unicode(v).encode(encoding)

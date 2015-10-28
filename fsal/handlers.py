@@ -20,6 +20,7 @@ import scandir
 from .import commandtypes
 from .fs import File, Directory
 from .serialize import str_to_bool
+from .utils import to_bytes
 
 
 def fnwalk(path, fn, shallow=False):
@@ -136,7 +137,7 @@ class SearchCommandHandler(CommandHandler):
                     files.append(File.from_path(self.base_path, rel_path))
         else:
             is_match = False
-            keywords = [bytes(k.lower()) for k in query.split()]
+            keywords = [to_bytes(k.lower()) for k in query.split()]
             whole_words = str_to_bool(self.command_data['params']['whole_words'])
             def path_checker(path):
                 def cmp(keyword, name):
