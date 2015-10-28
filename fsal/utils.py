@@ -74,7 +74,8 @@ def lru_cache(maxsize=100):
 
     '''
     def decorating_function(user_function):
-        cache = collections.OrderedDict()    # order: least recent to most recent
+        # order: least recent to most recent
+        cache = collections.OrderedDict()
 
         @functools.wraps(user_function)
         def wrapper(*args, **kwds):

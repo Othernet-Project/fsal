@@ -114,12 +114,12 @@ class FSDBManager(object):
         remover = shutil.rmtree if fso.is_dir() else os.remove
         try:
             remover(fso.path)
-            q = self.db.Delete(self.FS_TABLE, where = 'path LIKE ?')
-            self.db.execute(q, ('%s%%'%(fso.rel_path),))
-            logging.debug("Removing %d files/folders" %(self.db.cursor.rowcount))
+            q = self.db.Delete(self.FS_TABLE, where='path LIKE ?')
+            self.db.execute(q, ('%s%%' % (fso.rel_path),))
+            logging.debug('Removing %d files/dirs' % (self.db.cursor.rowcount))
             self._record_op_time()
         except Exception as e:
-            #FIXME: Handle exceptions more gracefully
+            # FIXME: Handle exceptions more gracefully
             self._refresh_db()
             return (False, str(e))
         else:
@@ -138,7 +138,7 @@ class FSDBManager(object):
         self._prune_db()
         self._update_db()
         end = time.time()
-        logging.debug('DB refreshed in %0.3f ms' %((end - start) * 1000))
+        logging.debug('DB refreshed in %0.3f ms' % ((end - start) * 1000))
 
     def _prune_db(self, batch_size=1000):
         with self.db.transaction():
@@ -170,7 +170,6 @@ class FSDBManager(object):
             for path in fnwalk(self.base_path, checker):
                 path = to_unicode(path)
                 rel_path = os.path.relpath(path, self.base_path)
-                #logging.debug("Updating db entry for %s" % rel_path)
                 if os.path.isdir(path):
                     fso = Directory.from_path(self.base_path, rel_path)
                 else:

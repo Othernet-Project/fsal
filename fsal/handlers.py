@@ -16,8 +16,6 @@ import os
 import shutil
 
 from .import commandtypes
-from .fs import File, Directory
-from .serialize import str_to_bool
 from .utils import to_bytes
 
 
@@ -69,7 +67,8 @@ class SearchCommandHandler(CommandHandler):
 
     def do_command(self):
         query = self.command_data['params']['query']
-        whole_words = str_to_bool(self.command_data['params']['whole_words'])
+        raw_whole_words = self.command_data['params']['whole_words']
+        whole_words = str_to_bool(raw_whole_words)
         is_match, fs_objs = self.fs_mgr.search(query, whole_words=whole_words)
         dirs = []
         files = []

@@ -205,14 +205,6 @@ class Database(object):
         return "<Database connection='%s'>" % self.conn.path
 
 
-
-#class DatabaseContainer(dict):
-#    def __init__(self, connections, debug=False):
-#        super(DatabaseContainer, self).__init__(
-#            {n: CachingLazy(Database, c, debug=debug)
-#             for n, c in connections.items()})
-#        self.__dict__ = self
-
 class DatabaseContainer(dict):
     def __init__(self, connections, debug=False):
         super(DatabaseContainer, self).__init__(
@@ -240,4 +232,3 @@ def get_connections(db_confs):
 def get_databases(db_confs, debug=False):
     conns = get_connections(db_confs)
     return DatabaseContainer(conns, debug=debug)
-

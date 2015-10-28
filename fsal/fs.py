@@ -38,6 +38,7 @@ class FSObject(object):
     def is_file(self):
         return False
 
+
 class File(FSObject):
 
     def __init__(self, base_path, rel_path, size, create_date, modify_date):
