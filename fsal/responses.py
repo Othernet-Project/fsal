@@ -92,8 +92,9 @@ class DirectoryListingResponse(GenericResponse):
         if success:
             params_node = SubElement(result_node, u'params')
 
+            base_path = self.response_data['params']['base_path']
             base_path_node = SubElement(params_node, u'base-path')
-            base_path_node.text = to_unicode(self.response_data['params']['base_path'])
+            base_path_node.text = to_unicode(base_path)
 
             dirs_node = SubElement(params_node, u'dirs')
             for d in self.response_data['params']['dirs']:
@@ -117,11 +118,13 @@ class SearchResponse(GenericResponse):
         if success:
             params_node = SubElement(result_node, u'params')
 
+            base_path = self.response_data['params']['base_path']
             base_path_node = SubElement(params_node, u'base-path')
-            base_path_node.text = to_unicode(self.response_data['params']['base_path'])
+            base_path_node.text = to_unicode(base_path)
 
+            is_match = to_unicode(self.response_data['params']['is_match'])
             is_match_node = SubElement(params_node, u'is-match')
-            is_match_node.text = to_unicode(self.response_data['params']['is_match']).lower()
+            is_match_node.text = is_match.lower()
 
             dirs_node = SubElement(params_node, u'dirs')
             for d in self.response_data['params']['dirs']:

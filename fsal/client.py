@@ -59,6 +59,7 @@ def sort_listing(fso_list):
     """
     fso_list.sort(key=lambda fso: fso.name)
 
+
 class FSAL(object):
 
     def __init__(self, socket_path):
@@ -72,7 +73,7 @@ class FSAL(object):
             sock.connect(self.socket_path)
             sock.sendall(message)
             return read_socket_stream(sock)
-        except socket.error as err:
+        except socket.error:
             if sock:
                 sock.close()
             sock = None
@@ -87,10 +88,10 @@ class FSAL(object):
             base_path = response_xml.find('.//base-path').text
             dirs_node = response_xml.find('.//dirs')
             files_node = response_xml.find('.//files')
-            dirs = list(iter_fsobjs(dirs_node,
-                               lambda n: Directory.from_xml(base_path, n)))
-            files = list(iter_fsobjs(files_node,
-                                lambda n: File.from_xml(base_path, n)))
+            dir_gen = functools.partial(Directory.from_xml, base_path)
+            file_gen = functools.partial(File.from_xml, base_path)
+            dirs = list(iter_fsobjs(dirs_node, dir_gen))
+            files = list(iter_fsobjs(files_node, file_gen))
             sort_listing(dirs)
             sort_listing(files)
         return (success, dirs, files)
@@ -125,7 +126,8 @@ class FSAL(object):
 
     def _parse_search_response(self, response_xml):
         success, dirs, files = self._parse_list_dir_response(response_xml)
-        is_match = success and str_to_bool(response_xml.find('.//is-match').text)
+        is_match = (success and
+                    str_to_bool(response_xml.find('.//is-match').text))
         return (dirs, files, is_match)
 
     def _parse_get_fso_response(self, response_xml):
