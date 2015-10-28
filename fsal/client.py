@@ -32,8 +32,7 @@ def read_socket_stream(sock, buff_size=2048):
     while buff and '\0' not in buff:
         buff = sock.recv(buff_size)
         data += buff
-    return data[:-1].decode(IN_ENCODING)
-
+    return data[:-1]
 
 
 def command(command_type, response_parser):
