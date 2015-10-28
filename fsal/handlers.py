@@ -16,7 +16,7 @@ import os
 import shutil
 
 from .import commandtypes
-from .utils import to_bytes
+from .serialize import str_to_bool
 
 
 def validate_path(base_path, path):
