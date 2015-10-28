@@ -20,7 +20,7 @@ if __name__ == "__main__":
         if pid > 0:
             # exit first parent
             sys.exit(0)
-    except OSError, e:
+    except OSError as e:
         print >>sys.stderr, "fork #1 failed: %d (%s)" % (e.errno, e.strerror)
         sys.exit(1)
 
@@ -34,7 +34,7 @@ if __name__ == "__main__":
         if pid > 0:
             # exit from second parent
             sys.exit(0)
-    except OSError, e:
+    except OSError as e:
         print >>sys.stderr, "fork #2 failed: %d (%s)" % (e.errno, e.strerror)
         sys.exit(1)
 
@@ -46,7 +46,7 @@ if __name__ == "__main__":
     args, unknown = parser.parse_known_args()
 
     pid = str(os.getpid())
-    with file(args.pidfile, "w") as f:
+    with open(args.pidfile, "w") as f:
         f.write("%s\n" % pid)
 
     atexit.register(lambda: os.remove(args.pidfile))

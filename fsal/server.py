@@ -54,13 +54,13 @@ def read_request(sock, buff_size=2048):
     data = buff = sock.recv(buff_size)
     while buff and '\0' not in buff:
         buff = sock.recv(buff_size)
-        data += buffer
+        data += buff
     return data[:-1].decode(IN_ENCODING)
 
 
 def send_response(sock, response_data):
     response = response_factory.create_response(response_data)
-    response_str = response.get_xml_str().encode(OUT_ENCODING)
+    response_str = response.get_xml_str(encoding=OUT_ENCODING)
     if not response_str[-1] == '\0':
         response_str += '\0'
     sock.sendall(response_str)

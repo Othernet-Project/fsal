@@ -20,6 +20,7 @@ import scandir
 from .import commandtypes
 from .fs import File, Directory
 from .serialize import str_to_bool
+from .utils import to_bytes
 
 
 def fnwalk(path, fn, shallow=False):
@@ -78,7 +79,7 @@ class CommandHandler(object):
         self.command_data = command_data
         self.base_path = os.path.abspath(config['fsal.basepath'])
         if not os.path.isdir(self.base_path):
-            raise RuntimeError('Invalid basepath: "%s"'%(self.base_path))
+            raise RuntimeError('Invalid basepath: "%s"' % (self.base_path))
 
     def do_command(self):
         raise NotImplementedError()
@@ -136,8 +137,10 @@ class SearchCommandHandler(CommandHandler):
                     files.append(File.from_path(self.base_path, rel_path))
         else:
             is_match = False
-            keywords = [k.lower() for k in query.split()]
-            whole_words = str_to_bool(self.command_data['params']['whole_words'])
+            keywords = [to_bytes(k.lower()) for k in query.split()]
+            raw_whole_words = self.command_data['params']['whole_words']
+            whole_words = str_to_bool(raw_whole_words)
+
             def path_checker(path):
                 def cmp(keyword, name):
                     if whole_words:
@@ -150,13 +153,13 @@ class SearchCommandHandler(CommandHandler):
                 return any(cmp(k, name) for k in keywords)
 
             for path in fnwalk(self.base_path, path_checker):
-                rel_path = os.path.relpath(path,self.base_path)
+                rel_path = os.path.relpath(path, self.base_path)
                 if os.path.isdir(path):
                     dirs.append(Directory.from_path(self.base_path, rel_path))
                 else:
                     files.append(File.from_path(self.base_path, rel_path))
 
-        params = {'base_path':self.base_path, 'dirs': dirs, 'files': files,
+        params = {'base_path': self.base_path, 'dirs': dirs, 'files': files,
                   'is_match': is_match}
         return self.send_result(success=True, params=params)
 
@@ -189,7 +192,7 @@ class ExistsCommandHandler(CommandHandler):
         path = self.command_data['params']['path']
         is_valid, full_path = validate_path(self.base_path, path)
         exists = is_valid and os.path.exists(full_path)
-        params = {'base_path':self.base_path, 'exists': exists}
+        params = {'base_path': self.base_path, 'exists': exists}
         return self.send_result(success=True, params=params)
 
 
@@ -200,7 +203,7 @@ class IsDirCommandHandler(CommandHandler):
         path = self.command_data['params']['path']
         is_valid, full_path = validate_path(self.base_path, path)
         isdir = is_valid and os.path.isdir(full_path)
-        params = {'base_path':self.base_path, 'isdir': isdir}
+        params = {'base_path': self.base_path, 'isdir': isdir}
         return self.send_result(success=True, params=params)
 
 
@@ -211,7 +214,7 @@ class IsFileCommandHandler(CommandHandler):
         path = self.command_data['params']['path']
         is_valid, full_path = validate_path(self.base_path, path)
         isfile = is_valid and os.path.isfile(full_path)
-        params = {'base_path':self.base_path, 'isfile': isfile}
+        params = {'base_path': self.base_path, 'isfile': isfile}
         return self.send_result(success=True, params=params)
 
 
@@ -222,17 +225,17 @@ class RemoveCommandHandler(CommandHandler):
         try:
             removal_func(path)
         except Exception as exc:
-            params = {'base_path':self.base_path, 'error': str(exc)}
+            params = {'base_path': self.base_path, 'error': str(exc)}
             return self.send_result(success=False, params=params)
         else:
-            params = {'base_path':self.base_path, 'error': None}
+            params = {'base_path': self.base_path, 'error': None}
             return self.send_result(success=True, params=params)
 
     def do_command(self):
         path = self.command_data['params']['path']
         is_valid, full_path = validate_path(self.base_path, path)
         if not (is_valid and os.path.exists(full_path)):
-            params = {'base_path':self.base_path, 'error': 'does_not_exist'}
+            params = {'base_path': self.base_path, 'error': 'does_not_exist'}
             return self.send_result(success=False, params=params)
 
         remover = shutil.rmtree if os.path.isdir(full_path) else os.remove
