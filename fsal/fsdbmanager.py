@@ -3,7 +3,7 @@ import shutil
 import logging
 import time
 
-from .utils import fnwalk
+from .utils import fnwalk, to_unicode
 from .fs import File, Directory
 try:
     from functools import lru_cache
@@ -168,6 +168,7 @@ class FSDBManager(object):
 
         with self.db.transaction():
             for path in fnwalk(self.base_path, checker):
+                path = to_unicode(path)
                 rel_path = os.path.relpath(path, self.base_path)
                 #logging.debug("Updating db entry for %s" % rel_path)
                 if os.path.isdir(path):
