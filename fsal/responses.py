@@ -47,6 +47,7 @@ def dict_to_xml(data, root=None):
 
 
 class GenericResponse:
+
     def __init__(self, response_data):
         self.response_data = response_data
 
@@ -79,9 +80,7 @@ def add_file_node(parent_node, fso):
     modify_timestamp_node.text = str(to_timestamp(fso.modify_date))
 
 
-class DirectoryListingResponse:
-    def __init__(self, response_data):
-        self.response_data = response_data
+class DirectoryListingResponse(GenericResponse):
 
     def get_xml(self):
         root = create_response_xml_root()
@@ -119,13 +118,8 @@ class DirectoryListingResponse:
 
         return root
 
-    def get_xml_str(self):
-        return tostring(self.get_xml())
 
-
-class SearchResponse:
-    def __init__(self, response_data):
-        self.response_data = response_data
+class SearchResponse(GenericResponse):
 
     def get_xml(self):
         root = create_response_xml_root()
@@ -166,13 +160,8 @@ class SearchResponse:
 
         return root
 
-    def get_xml_str(self):
-        return tostring(self.get_xml())
 
-
-class GetFSOResponse:
-    def __init__(self, response_data):
-        self.response_data = response_data
+class GetFSOResponse(GenericResponse):
 
     def get_xml(self):
         root = create_response_xml_root()
@@ -191,9 +180,6 @@ class GetFSOResponse:
                 add_file_node(params_node, params['file'])
 
         return root
-
-    def get_xml_str(self):
-        return tostring(self.get_xml())
 
 
 class CommandResponseFactory:
