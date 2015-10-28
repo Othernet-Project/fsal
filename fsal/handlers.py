@@ -136,7 +136,7 @@ class SearchCommandHandler(CommandHandler):
                     files.append(File.from_path(self.base_path, rel_path))
         else:
             is_match = False
-            keywords = [k.lower() for k in query.split()]
+            keywords = [bytes(k.lower()) for k in query.split()]
             whole_words = str_to_bool(self.command_data['params']['whole_words'])
             def path_checker(path):
                 def cmp(keyword, name):
