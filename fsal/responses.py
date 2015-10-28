@@ -15,10 +15,11 @@ from datetime import datetime
 from xml.etree.ElementTree import Element, SubElement, tostring
 
 from . import commandtypes
+from .utils import to_unicode
 
 
 def create_response_xml_root():
-    return Element('response')
+    return Element(u'response')
 
 
 def to_timestamp(dt, epoch=datetime(1970, 1, 1)):
@@ -33,7 +34,7 @@ def singular_name(name):
 
 
 def dict_to_xml(data, root=None):
-    root = Element('response') if root is None else root
+    root = Element(u'response') if root is None else root
     for key, value in data.items():
         subnode = SubElement(root, key)
         if isinstance(value, dict):
@@ -42,7 +43,7 @@ def dict_to_xml(data, root=None):
             for v in value:
                 dict_to_xml({singular_name(key): v}, root=subnode)
         else:
-            subnode.text = str(value)
+            subnode.text = to_unicode(value)
     return root
 
 
@@ -54,51 +55,51 @@ class GenericResponse:
     def get_xml(self):
         return dict_to_xml(self.response_data)
 
-    def get_xml_str(self):
-        return tostring(self.get_xml())
+    def get_xml_str(self, encoding='utf-8'):
+        return tostring(self.get_xml(), encoding=encoding)
 
 
 def add_dir_node(parent_node, fso):
-    dir_node = SubElement(parent_node, 'dir')
-    rel_path_node = SubElement(dir_node, 'rel-path')
-    rel_path_node.text = fso.rel_path
-    create_timestamp_node = SubElement(dir_node, 'create-timestamp')
-    create_timestamp_node.text = str(to_timestamp(fso.create_date))
-    modify_timestamp_node = SubElement(dir_node, 'modify-timestamp')
-    modify_timestamp_node.text = str(to_timestamp(fso.modify_date))
+    dir_node = SubElement(parent_node, u'dir')
+    rel_path_node = SubElement(dir_node, u'rel-path')
+    rel_path_node.text = to_unicode(fso.rel_path)
+    create_timestamp_node = SubElement(dir_node, u'create-timestamp')
+    create_timestamp_node.text = to_unicode(to_timestamp(fso.create_date))
+    modify_timestamp_node = SubElement(dir_node, u'modify-timestamp')
+    modify_timestamp_node.text = to_unicode(to_timestamp(fso.modify_date))
 
 
 def add_file_node(parent_node, fso):
-    file_node = SubElement(parent_node, 'file')
-    rel_path_node = SubElement(file_node, 'rel-path')
-    rel_path_node.text = fso.rel_path
-    size_node = SubElement(file_node, 'size')
-    size_node.text = str(fso.size)
-    create_timestamp_node = SubElement(file_node, 'create-timestamp')
-    create_timestamp_node.text = str(to_timestamp(fso.create_date))
-    modify_timestamp_node = SubElement(file_node, 'modify-timestamp')
-    modify_timestamp_node.text = str(to_timestamp(fso.modify_date))
+    file_node = SubElement(parent_node, u'file')
+    rel_path_node = SubElement(file_node, u'rel-path')
+    rel_path_node.text = to_unicode(fso.rel_path)
+    size_node = SubElement(file_node, u'size')
+    size_node.text = to_unicode(fso.size)
+    create_timestamp_node = SubElement(file_node, u'create-timestamp')
+    create_timestamp_node.text = to_unicode(to_timestamp(fso.create_date))
+    modify_timestamp_node = SubElement(file_node, u'modify-timestamp')
+    modify_timestamp_node.text = to_unicode(to_timestamp(fso.modify_date))
 
 
 class DirectoryListingResponse(GenericResponse):
 
     def get_xml(self):
         root = create_response_xml_root()
-        result_node = SubElement(root, 'result')
-        success_node = SubElement(result_node, 'success')
+        result_node = SubElement(root, u'result')
+        success_node = SubElement(result_node, u'success')
         success = self.response_data['success']
-        success_node.text = str(success).lower()
+        success_node.text = to_unicode(success).lower()
         if success:
-            params_node = SubElement(result_node, 'params')
+            params_node = SubElement(result_node, u'params')
 
-            base_path_node = SubElement(params_node, 'base-path')
-            base_path_node.text = self.response_data['params']['base_path']
+            base_path_node = SubElement(params_node, u'base-path')
+            base_path_node.text = to_unicode(self.response_data['params']['base_path'])
 
-            dirs_node = SubElement(params_node, 'dirs')
+            dirs_node = SubElement(params_node, u'dirs')
             for d in self.response_data['params']['dirs']:
                 add_dir_node(dirs_node, d)
 
-            files_node = SubElement(params_node, 'files')
+            files_node = SubElement(params_node, u'files')
             for f in self.response_data['params']['files']:
                 add_file_node(files_node, f)
 
@@ -109,24 +110,24 @@ class SearchResponse(GenericResponse):
 
     def get_xml(self):
         root = create_response_xml_root()
-        result_node = SubElement(root, 'result')
-        success_node = SubElement(result_node, 'success')
+        result_node = SubElement(root, u'result')
+        success_node = SubElement(result_node, u'success')
         success = self.response_data['success']
-        success_node.text = str(success).lower()
+        success_node.text = to_unicode(success).lower()
         if success:
-            params_node = SubElement(result_node, 'params')
+            params_node = SubElement(result_node, u'params')
 
-            base_path_node = SubElement(params_node, 'base-path')
-            base_path_node.text = self.response_data['params']['base_path']
+            base_path_node = SubElement(params_node, u'base-path')
+            base_path_node.text = to_unicode(self.response_data['params']['base_path'])
 
-            is_match_node = SubElement(params_node, 'is-match')
-            is_match_node.text = str(self.response_data['params']['is_match']).lower()
+            is_match_node = SubElement(params_node, u'is-match')
+            is_match_node.text = to_unicode(self.response_data['params']['is_match']).lower()
 
-            dirs_node = SubElement(params_node, 'dirs')
+            dirs_node = SubElement(params_node, u'dirs')
             for d in self.response_data['params']['dirs']:
                 add_dir_node(dirs_node, d)
 
-            files_node = SubElement(params_node, 'files')
+            files_node = SubElement(params_node, u'files')
             for f in self.response_data['params']['files']:
                 add_file_node(files_node, f)
 
@@ -137,15 +138,15 @@ class GetFSOResponse(GenericResponse):
 
     def get_xml(self):
         root = create_response_xml_root()
-        result_node = SubElement(root, 'result')
-        success_node = SubElement(result_node, 'success')
+        result_node = SubElement(root, u'result')
+        success_node = SubElement(result_node, u'success')
         success = self.response_data['success']
-        success_node.text = str(success).lower()
+        success_node.text = to_unicode(success).lower()
         if success:
             params = self.response_data['params']
-            params_node = SubElement(result_node, 'params')
-            base_path_node = SubElement(params_node, 'base-path')
-            base_path_node.text = params['base_path']
+            params_node = SubElement(result_node, u'params')
+            base_path_node = SubElement(params_node, u'base-path')
+            base_path_node.text = to_unicode(params['base_path'])
             if 'dir' in params:
                 add_dir_node(params_node, params['dir'])
             else:
