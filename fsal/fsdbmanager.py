@@ -49,17 +49,21 @@ class FSDBManager(object):
             cursor = self.db.query(q, d.__id)
             return (True, self._fso_row_iterator(cursor))
 
-    def search(self, query):
-        #TODO: Add support for whole_words
+    def search(self, query, whole_words=False):
         success, files = self.list_dir(query)
         if success:
             return (success, files)
         else:
-            keywords = ["%%%s%%" % k for k in query.split()]
+            like_pattern = '%s' if whole_words else '%%%s%%'
+            like_words = [(like_pattern % k) for k in query.split()]
             q = self.db.Select('*', sets=self.FS_TABLE)
-            for _ in keywords:
-                q.where |= 'name LIKE ?'
-            self.db.execute(q, keywords)
+            for _ in like_words:
+                if whole_words:
+                    where_clause = 'name like ?'
+                else:
+                    where_clause = 'lower(name) like ?'
+                q.where |= where_clause
+            self.db.execute(q, like_words)
             return (False, self._fso_row_iterator(self.db.cursor))
 
     def exists(self, path):

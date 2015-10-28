@@ -69,7 +69,8 @@ class SearchCommandHandler(CommandHandler):
 
     def do_command(self):
         query = self.command_data['params']['query']
-        is_match, fs_objs = self.fs_mgr.search(query)
+        whole_words = str_to_bool(self.command_data['params']['whole_words'])
+        is_match, fs_objs = self.fs_mgr.search(query, whole_words=whole_words)
         dirs = []
         files = []
         for fso in fs_objs:
