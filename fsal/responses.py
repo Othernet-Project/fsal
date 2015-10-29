@@ -16,6 +16,7 @@ from xml.etree.ElementTree import Element, SubElement, tostring
 
 from . import commandtypes
 from .utils import to_unicode
+from .serialize import singular_name
 
 
 def create_response_xml_root():
@@ -25,12 +26,6 @@ def create_response_xml_root():
 def to_timestamp(dt, epoch=datetime(1970, 1, 1)):
     delta = dt - epoch
     return delta.total_seconds()
-
-
-def singular_name(name):
-    """Returns same string without it's trailing character, which hopefully is
-    satisfactory to make the word singular, but it probably isn't."""
-    return name[:-1]
 
 
 def dict_to_xml(data, root=None):
