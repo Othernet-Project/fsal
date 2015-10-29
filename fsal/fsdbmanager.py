@@ -18,7 +18,7 @@ class FSDBManager(object):
     FS_TABLE = 'fsentries'
     STATS_TABLE = 'dbmgr_stats'
 
-    ROOT_DIR_PATHS = ('.', os.sep)
+    ROOT_DIR_PATH = '.'
 
     def __init__(self, config, context):
         base_path = os.path.abspath(config['fsal.basepath'])
@@ -79,9 +79,10 @@ class FSDBManager(object):
 
     @lru_cache(maxsize=100)
     def get_fso(self, path):
-        if not self._is_valid_path(path):
+        valid, path = self._validate_path(path)
+        if not valid:
             return None
-        if path in self.ROOT_DIR_PATHS:
+        if path == self.ROOT_DIR_PATH:
             return self.get_root_dir()
         else:
             q = self.db.Select('*', sets=self.FS_TABLE, where='path = ?')
@@ -96,12 +97,16 @@ class FSDBManager(object):
         else:
             return self._remove_fso(fso)
 
-    def _is_valid_path(self, path):
+    def _validate_path(self, path):
         if path is None:
-            return False
-        path = path.lstrip(os.sep)
-        full_path = os.path.abspath(os.path.join(self.base_path, path))
-        return full_path.startswith(self.base_path)
+            valid = False
+        else:
+            path = path.lstrip(os.sep)
+            path = path.rstrip(os.sep)
+            full_path = os.path.abspath(os.path.join(self.base_path, path))
+            valid = full_path.startswith(self.base_path)
+            path = os.path.relpath(full_path, self.base_path)
+        return (valid, path)
 
     def _construct_fso(self, row):
         type = row.type
