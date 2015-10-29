@@ -1,7 +1,9 @@
 import os
+import re
 import shutil
 import logging
 import time
+from itertools import ifilter
 
 from .utils import fnwalk, to_unicode
 from .fs import File, Directory
@@ -49,10 +51,10 @@ class FSDBManager(object):
             cursor = self.db.query(q, d.__id)
             return (True, self._fso_row_iterator(cursor))
 
-    def search(self, query, whole_words=False):
-        success, files = self.list_dir(query)
-        if success:
-            return (success, files)
+    def search(self, query, whole_words=False, exclude=None):
+        is_match, files = self.list_dir(query)
+        if is_match:
+            result_gen = files
         else:
             like_pattern = '%s' if whole_words else '%%%s%%'
             like_words = [(like_pattern % k) for k in query.split()]
@@ -64,7 +66,15 @@ class FSDBManager(object):
                     where_clause = 'lower(name) like ?'
                 q.where |= where_clause
             self.db.execute(q, like_words)
-            return (False, self._fso_row_iterator(self.db.cursor))
+            result_gen = self._fso_row_iterator(self.db.cursor)
+
+        if exclude and len(exclude) > 0:
+            clean_exclude = [f.replace('.', '\.') for f in exclude]
+            rxp_str = '|'.join(['^%s$' % f for f in clean_exclude])
+            rxp = re.compile(rxp_str)
+            result_gen = ifilter(lambda fso: rxp.match(fso.name) is None,
+                                 result_gen)
+        return (is_match, result_gen)
 
     def exists(self, path):
         return (self.get_fso(path) is not None)

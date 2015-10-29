@@ -8,7 +8,7 @@ from xml.etree.ElementTree import Element, SubElement, tostring
 
 from . import commandtypes
 from .fs import File, Directory
-from .serialize import str_to_bool, bool_to_str
+from .serialize import str_to_bool, bool_to_str, singular_name
 
 
 IN_ENCODING = 'utf-8'
@@ -23,8 +23,20 @@ def build_request_xml(command, params):
     params_node = SubElement(command_node, 'params')
     for key, value in params.iteritems():
         param_node = SubElement(params_node, key)
-        param_node.text = value
+        if isinstance(value, list):
+            add_list_xml(value, param_node)
+        else:
+            param_node.text = value
     return root
+
+
+def add_list_xml(items, parent):
+    """
+    Add each element of a flat list as child node to parent
+    """
+    for item in items:
+        node = SubElement(parent, singular_name(parent.tag))
+        node.text = item
 
 
 def read_socket_stream(sock, buff_size=2048):
@@ -167,9 +179,10 @@ class FSAL(object):
         return {'path': path}
 
     @command(commandtypes.COMMAND_TYPE_SEARCH, _parse_search_response)
-    def search(self, query, whole_words=False):
+    def search(self, query, whole_words=False, exclude=None):
         return {'query': query,
-                'whole_words': bool_to_str(whole_words)}
+                'whole_words': bool_to_str(whole_words),
+                'excludes': exclude}
 
     @command(commandtypes.COMMAND_TYPE_GET_FSO, _parse_get_fso_response)
     def get_fso(self, path):

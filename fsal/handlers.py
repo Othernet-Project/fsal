@@ -66,10 +66,13 @@ class SearchCommandHandler(CommandHandler):
     command_type = commandtypes.COMMAND_TYPE_SEARCH
 
     def do_command(self):
-        query = self.command_data['params']['query']
-        raw_whole_words = self.command_data['params']['whole_words']
-        whole_words = str_to_bool(raw_whole_words)
-        is_match, fs_objs = self.fs_mgr.search(query, whole_words=whole_words)
+        params = self.command_data['params']
+        query = params['query']
+        whole_words = str_to_bool(params['whole_words'])
+        excludes = params['excludes']
+        exclude = list(excludes['exclude']) if excludes else None
+        is_match, fs_objs = self.fs_mgr.search(query, whole_words=whole_words,
+                                               exclude=exclude)
         dirs = []
         files = []
         for fso in fs_objs:
