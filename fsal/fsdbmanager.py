@@ -13,6 +13,16 @@ except:
     from .utils import lru_cache
 
 
+SQL_ESCAPE_CHAR = '/'
+SQL_WILDCARDS = [('_', SQL_ESCAPE_CHAR + '_'),
+                 ('%', SQL_ESCAPE_CHAR + '%')]
+
+def sql_escape_path(path):
+    for char, escaped_char in SQL_WILDCARDS:
+        path = path.replace(char, escaped_char)
+    return path
+
+
 class FSDBManager(object):
     FILE_TYPE = 0
     DIR_TYPE = 1
@@ -57,13 +67,15 @@ class FSDBManager(object):
             result_gen = files
         else:
             like_pattern = '%s' if whole_words else '%%%s%%'
-            like_words = [(like_pattern % k) for k in query.split()]
+            words = map(sql_escape_path, query.split())
+            like_words = [(like_pattern % w) for w in words]
             q = self.db.Select('*', sets=self.FS_TABLE)
             for _ in like_words:
                 if whole_words:
-                    where_clause = 'name like ?'
+                    where_clause = 'name LIKE ?'
                 else:
-                    where_clause = 'lower(name) like ?'
+                    where_clause = 'lower(name) LIKE ?'
+                where_clause += ' ESCAPE "%s"' % SQL_ESCAPE_CHAR
                 q.where |= where_clause
             self.db.execute(q, like_words)
             result_gen = self._fso_row_iterator(self.db.cursor)
@@ -129,8 +141,9 @@ class FSDBManager(object):
         remover = shutil.rmtree if fso.is_dir() else os.remove
         try:
             remover(fso.path)
-            q = self.db.Delete(self.FS_TABLE, where='path LIKE ?')
-            self.db.execute(q, ('%s%%' % (fso.rel_path),))
+            q = self.db.Delete(self.FS_TABLE)
+            q.where='path LIKE ? ESCAPE "%s"' % SQL_ESCAPE_CHAR
+            self.db.execute(q, ('%s%%' % (sql_escape_path(fso.rel_path)),))
             logging.debug('Removing %d files/dirs' % (self.db.cursor.rowcount))
             self._record_op_time()
         except Exception as e:
