@@ -47,7 +47,7 @@ class DirectoryListingCommandHandler(CommandHandler):
     command_type = commandtypes.COMMAND_TYPE_LIST_DIR
 
     def do_command(self):
-        path = self.command_data['params']['path']
+        path = self.command_data.params.path.data
         success, fs_objs = self.fs_mgr.list_dir(path)
         dirs = []
         files = []
@@ -66,11 +66,15 @@ class SearchCommandHandler(CommandHandler):
     command_type = commandtypes.COMMAND_TYPE_SEARCH
 
     def do_command(self):
-        params = self.command_data['params']
-        query = params['query']
-        whole_words = str_to_bool(params['whole_words'])
-        excludes = params['excludes']
-        exclude = list(excludes['exclude']) if excludes else None
+        params = self.command_data.params
+        query = params.query.data
+        whole_words = str_to_bool(params.whole_words.data)
+        if len(params.excludes.children) > 0:
+            exclude = []
+            for c in params.excludes.children:
+                exclude.append(c.data)
+        else:
+            exclude = None
         is_match, fs_objs = self.fs_mgr.search(query, whole_words=whole_words,
                                                exclude=exclude)
         dirs = []
@@ -92,8 +96,8 @@ class CopyCommandHandler(CommandHandler):
     is_synchronous = False
 
     def do_command(self):
-        source_path = self.command_data['params']['source']
-        dest_path = self.command_data['params']['dest']
+        source_path = self.command_data.params.source.data
+        dest_path = self.command_data.params.dest.data
         source_valid, source_path = validate_path(self.base_path, source_path)
         dest_valid, dest_path = validate_path(self.base_path, dest_path)
         if not (source_valid and dest_valid):
@@ -111,7 +115,7 @@ class ExistsCommandHandler(CommandHandler):
     command_type = commandtypes.COMMAND_TYPE_EXISTS
 
     def do_command(self):
-        path = self.command_data['params']['path']
+        path = self.command_data.params.path.data
         if path is None:
             exists = False
         else:
@@ -124,7 +128,7 @@ class IsDirCommandHandler(CommandHandler):
     command_type = commandtypes.COMMAND_TYPE_ISDIR
 
     def do_command(self):
-        path = self.command_data['params']['path']
+        path = self.command_data.params.path.data
         if path is None:
             isdir = False
         else:
@@ -137,7 +141,7 @@ class IsFileCommandHandler(CommandHandler):
     command_type = commandtypes.COMMAND_TYPE_ISFILE
 
     def do_command(self):
-        path = self.command_data['params']['path']
+        path = self.command_data.params.path.data
         if path is None:
             isfile = False
         else:
@@ -150,7 +154,7 @@ class RemoveCommandHandler(CommandHandler):
     command_type = commandtypes.COMMAND_TYPE_REMOVE
 
     def do_command(self):
-        path = self.command_data['params']['path']
+        path = self.command_data.params.path.data
         success, msg = self.fs_mgr.remove(path)
         params = {'error': msg}
         return self.send_result(success=success, params=params)
@@ -160,7 +164,7 @@ class GetFSOCommandHandler(CommandHandler):
     command_type = commandtypes.COMMAND_TYPE_GET_FSO
 
     def do_command(self):
-        path = self.command_data['params']['path']
+        path = self.command_data.params.path.data
         fso = self.fs_mgr.get_fso(path)
         success = fso is not None
         if success:
@@ -182,7 +186,7 @@ class CommandHandlerFactory(object):
                                 for handler_cls in all_handlers)
 
     def create_handler(self, command_data):
-        command_type = command_data['type']
+        command_type = command_data.type.data
         try:
             handler_cls = self.handler_map[command_type]
         except KeyError:

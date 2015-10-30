@@ -22,10 +22,10 @@ import logging
 from contextlib import contextmanager
 from os.path import join, dirname, abspath, normpath
 
-import xmltodict
 import xml.etree.ElementTree as ET
 from gevent.server import StreamServer
 
+from .xmlparser import parsestring
 from .confloader import ConfDict
 from .handlers import CommandHandlerFactory
 from .responses import CommandResponseFactory
@@ -68,8 +68,8 @@ class FSALServer(object):
             self.server.stop()
 
     def request_handler(self, sock, address):
-        request_data = xmltodict.parse(self.read_request(sock))['request']
-        command_data = request_data['command']
+        request_data = parsestring(self.read_request(sock)).request
+        command_data = request_data.command
         handler = self.handler_factory.create_handler(command_data)
         if handler.is_synchronous:
             self.send_response(sock, handler.do_command())
