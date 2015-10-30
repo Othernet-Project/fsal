@@ -12,7 +12,7 @@ def cleanup(pidfile):
     os.remove(pidfile)
 
 
-if __name__ == "__main__":
+def main():
     # do the UNIX double-fork magic, see Stevens' "Advanced
     # Programming in the UNIX Environment" for details (ISBN 0201563177)
     try:
@@ -52,3 +52,7 @@ if __name__ == "__main__":
     atexit.register(lambda: os.remove(args.pidfile))
 
     fsal.server.main()
+
+
+if __name__ == "__main__":
+    main()

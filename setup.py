@@ -94,6 +94,7 @@ setup(
     entry_points = {
         'console_scripts': [
             'fsal = fsal.server:main',
+            'fsal-daemon = fsal.daemon:main'
         ],
     },
     install_requires=DEPS,
