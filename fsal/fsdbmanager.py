@@ -7,15 +7,12 @@ from itertools import ifilter
 
 from .utils import fnwalk, to_unicode
 from .fs import File, Directory
-try:
-    from functools import lru_cache
-except:
-    from .utils import lru_cache
 
 
-SQL_ESCAPE_CHAR = '/'
+SQL_ESCAPE_CHAR = '\\'
 SQL_WILDCARDS = [('_', SQL_ESCAPE_CHAR + '_'),
                  ('%', SQL_ESCAPE_CHAR + '%')]
+
 
 def sql_escape_path(path):
     for char, escaped_char in SQL_WILDCARDS:
@@ -99,7 +96,6 @@ class FSDBManager(object):
         fso = self._get_file(path)
         return (fso is not None)
 
-    @lru_cache(maxsize=100)
     def get_fso(self, path):
         valid, path = self._validate_path(path)
         if not valid:
@@ -120,9 +116,10 @@ class FSDBManager(object):
             return self._remove_fso(fso)
 
     def _validate_path(self, path):
-        if path is None:
+        if path is None or len(path.strip()) == 0:
             valid = False
         else:
+            path = path.strip()
             path = path.lstrip(os.sep)
             path = path.rstrip(os.sep)
             full_path = os.path.abspath(os.path.join(self.base_path, path))
@@ -141,12 +138,20 @@ class FSDBManager(object):
         remover = shutil.rmtree if fso.is_dir() else os.remove
         try:
             remover(fso.path)
+            path = sql_escape_path(fso.rel_path)
             q = self.db.Delete(self.FS_TABLE)
-            q.where='path LIKE ? ESCAPE "%s"' % SQL_ESCAPE_CHAR
-            self.db.execute(q, ('%s%%' % (sql_escape_path(fso.rel_path)),))
+            q.where = 'path LIKE ? ESCAPE "%s"' % SQL_ESCAPE_CHAR
+            if fso.is_dir():
+                pattern = '%s' + os.sep + '%%'
+                self.db.executemany(q, (((pattern % path),), (path,)))
+            else:
+                self.db.execute(q, (path,))
+
             logging.debug('Removing %d files/dirs' % (self.db.cursor.rowcount))
             self._record_op_time()
         except Exception as e:
+            msg = 'Exception while removing "%s": %s' % (fso.rel_path, str(e))
+            logging.error(msg)
             # FIXME: Handle exceptions more gracefully
             self._refresh_db()
             return (False, str(e))
