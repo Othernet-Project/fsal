@@ -38,6 +38,13 @@ class FSDBManager(object):
         self.base_path = base_path
         self.db = context['databases'].fs
         self.last_op_time = self._read_last_op_time()
+        blacklist = config['fsal.blacklist']
+        sanitized_blacklist = []
+        for p in blacklist:
+            valid, p = self._validate_path(p)
+            if valid:
+                sanitized_blacklist.append(p)
+        self.blacklist = sanitized_blacklist
 
     def start(self):
         self._refresh_db()
@@ -128,6 +135,9 @@ class FSDBManager(object):
             path = os.path.relpath(full_path, self.base_path)
         return (valid, path)
 
+    def _is_blacklisted(self, path):
+        return any([path.startswith(p) for p in self.blacklist])
+
     def _construct_fso(self, row):
         type = row.type
         cls = Directory if type == self.DIR_TYPE else File
@@ -183,7 +193,7 @@ class FSDBManager(object):
             for result in cursor:
                 path = result.path
                 full_path = os.path.join(self.base_path, path)
-                if not os.path.exists(full_path):
+                if not os.path.exists(full_path) or self._is_blacklisted(path):
                     removed_paths.append(path)
                 if len(removed_paths) >= batch_size:
                     self._remove_paths(removed_paths)
@@ -197,8 +207,11 @@ class FSDBManager(object):
 
     def _update_db(self):
         def checker(path):
-            return (path != self.base_path and not os.path.islink(path) and
-                    os.path.getmtime(path) > self.last_op_time)
+            result = (path != self.base_path and not os.path.islink(path))
+            rel_path = os.path.relpath(path, self.base_path)
+            result = result and not self._is_blacklisted(rel_path)
+            result = result and os.path.getmtime(path) > self.last_op_time
+            return result
 
         id_cache = FIFOCache(1024)
         with self.db.transaction():
