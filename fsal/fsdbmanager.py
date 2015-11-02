@@ -3,6 +3,7 @@ import re
 import shutil
 import logging
 import time
+import collections
 from itertools import ifilter
 
 from .utils import fnwalk, to_unicode
@@ -199,21 +200,27 @@ class FSDBManager(object):
             return (path != self.base_path and not os.path.islink(path) and
                     os.path.getmtime(path) > self.last_op_time)
 
+        id_cache = FIFOCache(1024)
         with self.db.transaction():
             for path in fnwalk(self.base_path, checker):
                 path = to_unicode(path)
                 rel_path = os.path.relpath(path, self.base_path)
+                parent_path, name = os.path.split(rel_path)
+                parent_id = id_cache[parent_path] if parent_path in id_cache else None
                 if os.path.isdir(path):
                     fso = Directory.from_path(self.base_path, rel_path)
                 else:
                     fso = File.from_path(self.base_path, rel_path)
-                self._update_fso_entry(fso)
+                fso_id = self._update_fso_entry(fso, parent_id)
+                if fso.is_dir():
+                    id_cache[fso.rel_path] = fso_id
         self._record_op_time()
 
-    def _update_fso_entry(self, fso):
-        parent, name = os.path.split(fso.rel_path)
-        parent_dir = self._get_dir(parent)
-        parent_id = parent_dir.__id if parent_dir else 0
+    def _update_fso_entry(self, fso, parent_id=None):
+        if not parent_id:
+            parent, name = os.path.split(fso.rel_path)
+            parent_dir = self._get_dir(parent)
+            parent_id = parent_dir.__id if parent_dir else 0
 
         cols = ['parent_id', 'type', 'name', 'size', 'create_time',
                 'modify_time', 'path']
@@ -223,6 +230,9 @@ class FSDBManager(object):
         values = [parent_id, type, fso.name, size, fso.create_date,
                   fso.modify_date, fso.rel_path]
         self.db.execute(q, values)
+        q = self.db.Select('last_insert_rowid() as id')
+        self.db.execute(q)
+        return self.db.result.id
 
     def _clear_db(self):
         with self.db.transaction():
@@ -247,3 +257,24 @@ class FSDBManager(object):
         self.last_op_time = time.time()
         q = self.db.Update(self.STATS_TABLE, op_time=':op_time')
         self.db.query(q, op_time=self.last_op_time)
+
+
+class FIFOCache(object):
+
+    def __init__(self, maxsize):
+        self.maxsize = maxsize
+        self.cache = collections.OrderedDict()
+
+    def __contains__(self, key):
+        return (key in self.cache)
+
+    def __getitem__(self, key):
+        try:
+            return self.cache[key]
+        except KeyError:
+            return None
+
+    def __setitem__(self, key, value):
+        if len(self.cache) >= self.maxsize:
+            self.cache.popitem(False)
+        self.cache[key] = value
