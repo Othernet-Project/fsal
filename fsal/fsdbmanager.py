@@ -196,7 +196,7 @@ class FSDBManager(object):
 
     def _update_db(self):
         def checker(path):
-            return (path != self.base_path and
+            return (path != self.base_path and not os.path.islink(path) and
                     os.path.getmtime(path) > self.last_op_time)
 
         with self.db.transaction():
