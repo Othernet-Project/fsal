@@ -9,7 +9,10 @@ import fsal.server
 
 
 def cleanup(pidfile):
-    os.remove(pidfile)
+    try:
+        os.remove(pidfile)
+    except OSError as e:
+        print >>sys.stderr, "pidfile cleanup failed with error: %s" % str(e)
 
 
 def main():
@@ -49,7 +52,7 @@ def main():
     with open(args.pidfile, "w") as f:
         f.write("%s\n" % pid)
 
-    atexit.register(lambda: os.remove(args.pidfile))
+    atexit.register(lambda: cleanup(args.pidfile))
 
     fsal.server.main()
 
