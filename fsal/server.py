@@ -16,9 +16,11 @@ from gevent import monkey
 monkey.patch_all(thread=False, aggressive=True)
 
 import os
+import sys
 import socket
 import signal
 import logging
+import logging.config
 from contextlib import contextmanager
 from os.path import join, dirname, abspath, normpath
 
@@ -119,6 +121,37 @@ def cleanup(context):
     close_databases(context['databases'])
 
 
+def configure_logging(config):
+    logging.config.dictConfig({
+        'version': 1,
+        'root': {
+            'handlers': ['file', 'console'],
+            'level': logging.DEBUG,
+        },
+        'handlers': {
+            'file': {
+                'class': 'logging.handlers.RotatingFileHandler',
+                'formatter': 'default',
+                'filename': config['logging.output'],
+                'maxBytes': config['logging.size'],
+                'backupCount': config['logging.backups'],
+            },
+            'console': {
+                'class': 'logging.StreamHandler',
+                'formatter': 'default',
+                'level': logging.INFO,
+                'stream': sys.stdout
+            }
+        },
+        'formatters': {
+            'default': {
+                'format': config['logging.format'],
+                'datefmt': config['logging.date_format'],
+            },
+        },
+    })
+
+
 def main():
     import argparse
 
@@ -131,7 +164,7 @@ def main():
     config_path = args.conf
     config = ConfDict.from_file(config_path, catchall=True, autojson=True)
 
-    logging.basicConfig(level=logging.DEBUG)
+    configure_logging(config)
 
     context = dict()
     context['config'] = config
