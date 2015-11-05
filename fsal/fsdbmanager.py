@@ -242,6 +242,10 @@ class FSDBManager(object):
         type = self.DIR_TYPE if fso.is_dir() else self.FILE_TYPE
         values = [parent_id, type, fso.name, size, fso.create_date,
                   fso.modify_date, fso.rel_path]
+        entry = self.get_fso(fso.rel_path)
+        if entry:
+            cols.append('id')
+            values.append(entry.__id)
         self.db.execute(q, values)
         q = self.db.Select('last_insert_rowid() as id')
         self.db.execute(q)
