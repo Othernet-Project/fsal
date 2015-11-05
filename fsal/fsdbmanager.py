@@ -53,9 +53,12 @@ class FSDBManager(object):
         pass
 
     def get_root_dir(self):
-        d = Directory.from_path(self.base_path, '.')
-        d.__id = 0
-        return d
+        try:
+            d = Directory.from_path(self.base_path, '.')
+            d.__id = 0
+            return d
+        except OSError:
+            return None
 
     def list_dir(self, path):
         d = self._get_dir(path)
