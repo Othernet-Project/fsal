@@ -9,9 +9,8 @@ import os
 import sys
 import stat
 
-from shutil import copyfile, copymode, copystat, _samefile, _basename, \
-    _destinsrc
-from shutil import Error, WindowsError
+from shutil import copymode, copystat, _samefile, _basename, _destinsrc
+from shutil import Error, WindowsError, SpecialFileError
 
 import gevent
 
@@ -38,6 +37,27 @@ def copy(src, dst):
         dst = os.path.join(dst, os.path.basename(src))
     copyfile(src, dst)
     copymode(src, dst)
+
+
+def copyfile(src, dst):
+    """Copy data from src to dst"""
+    if _samefile(src, dst):
+        raise Error("`%s` and `%s` are the same file" % (src, dst))
+
+    for fn in [src, dst]:
+        try:
+            st = os.stat(fn)
+        except OSError:
+            # File most likely does not exist
+            pass
+        else:
+            # XXX What about other special files? (sockets, devices...)
+            if stat.S_ISFIFO(st.st_mode):
+                raise SpecialFileError("`%s` is a named pipe" % fn)
+
+    with open(src, 'rb') as fsrc:
+        with open(dst, 'wb') as fdst:
+            copyfileobj(fsrc, fdst)
 
 
 def copytree(src, dst, symlinks=False, ignore=None):
