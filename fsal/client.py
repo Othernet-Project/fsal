@@ -198,5 +198,3 @@ class FSAL(object):
     @command(commandtypes.COMMAND_TYPE_TRANSFER, _parse_transfer_response)
     def transfer(self, src, dest):
         return {'src': src, 'dest': dest}
-
-

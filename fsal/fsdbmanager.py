@@ -133,8 +133,10 @@ class FSDBManager(object):
             return (False, u'Invalid transfer source directory %s' % src)
         if not dest_valid:
             return (False, u'Invalid transfer destination directory %s' % dest)
+
         abs_dest = os.path.abspath(os.path.join(self.base_path, dest))
-        logging.debug('Transfering content from "%s" to "%s"' % (src, abs_dest))
+        logging.debug('Transferring content from "%s" to "%s"' %
+                      (src, abs_dest))
         msg = None
         success = True
         try:
