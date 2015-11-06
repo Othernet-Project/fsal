@@ -177,6 +177,17 @@ class GetFSOCommandHandler(CommandHandler):
         return self.send_result(success=success, params=params)
 
 
+class TransferCommandHandler(CommandHandler):
+    command_type = commandtypes.COMMAND_TYPE_TRANSFER
+
+    def do_command(self):
+        src = self.command_data.params.src.data
+        dest = self.command_data.params.dest.data
+        success, msg = self.fs_mgr.transfer(src, dest)
+        params = {'error': msg}
+        return self.send_result(success=success, params=params)
+
+
 class CommandHandlerFactory(object):
 
     def __init__(self, context):

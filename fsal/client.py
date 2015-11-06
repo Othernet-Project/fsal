@@ -158,6 +158,13 @@ class FSAL(object):
         error = error_node.text
         return (success, error)
 
+    def _parse_transfer_response(self, response_xml):
+        success_node = response_xml.find('.//success')
+        success = str_to_bool(success_node.text)
+        error_node = response_xml.find('.//error')
+        error = error_node.text
+        return (success, error)
+
     @command(commandtypes.COMMAND_TYPE_LIST_DIR, _parse_list_dir_response)
     def list_dir(self, path):
         return {'path': path}
@@ -187,3 +194,9 @@ class FSAL(object):
     @command(commandtypes.COMMAND_TYPE_GET_FSO, _parse_get_fso_response)
     def get_fso(self, path):
         return {'path': path}
+
+    @command(commandtypes.COMMAND_TYPE_TRANSFER, _parse_transfer_response)
+    def transfer(self, src, dest):
+        return {'src': src, 'dest': dest}
+
+

@@ -1,5 +1,6 @@
 import os
 import re
+import asyncfs
 import shutil
 import logging
 import time
@@ -125,6 +126,26 @@ class FSDBManager(object):
         else:
             return self._remove_fso(fso)
 
+    def transfer(self, src, dest):
+        src_valid, src = self._validate_external_path(src)
+        dest_valid, dest = self._validate_path(dest)
+        if not src_valid or not os.path.exists(src):
+            return (False, u'Invalid transfer source directory %s' % src)
+        if not dest_valid:
+            return (False, u'Invalid transfer destination directory %s' % dest)
+        abs_dest = os.path.abspath(os.path.join(self.base_path, dest))
+        logging.debug('Transfering content from "%s" to "%s"' % (src, abs_dest))
+        msg = None
+        success = True
+        try:
+            asyncfs.move(src, abs_dest)
+        except (asyncfs.Error, IOError) as e:
+            logging.error('Error while transfering content: %s' % str(e))
+            success = False
+            msg = str(e)
+        self._update_db(dest)
+        return (success, msg)
+
     def _validate_path(self, path):
         if path is None or len(path.strip()) == 0:
             valid = False
@@ -136,6 +157,15 @@ class FSDBManager(object):
             valid = full_path.startswith(self.base_path)
             path = os.path.relpath(full_path, self.base_path)
         return (valid, path)
+
+    def _validate_external_path(self, path):
+        if path is None or len(path.strip()) == 0:
+            return (False, path)
+        else:
+            path = path.strip()
+            path = path.rstrip(os.sep)
+            full_path = os.path.abspath(path)
+            return (True, full_path)
 
     def _is_blacklisted(self, path):
         return any([path.startswith(p) for p in self.blacklist])
@@ -195,6 +225,7 @@ class FSDBManager(object):
                 path = result.path
                 full_path = os.path.join(self.base_path, path)
                 if not os.path.exists(full_path) or self._is_blacklisted(path):
+                    logging.debug('Removing db entry for "%s"' % path)
                     removed_paths.append(path)
                 if len(removed_paths) >= batch_size:
                     self._remove_paths(removed_paths)
@@ -206,16 +237,17 @@ class FSDBManager(object):
         q = self.db.Delete(self.FS_TABLE, where='path = ?')
         self.db.executemany(q, ((p,) for p in paths))
 
-    def _update_db(self):
+    def _update_db(self, src_path=ROOT_DIR_PATH):
         def checker(path):
             result = (path != self.base_path and not os.path.islink(path))
             rel_path = os.path.relpath(path, self.base_path)
             result = result and not self._is_blacklisted(rel_path)
             return result
 
+        src_path = os.path.abspath(os.path.join(self.base_path, src_path))
         id_cache = FIFOCache(1024)
         with self.db.transaction():
-            for path in fnwalk(self.base_path, checker):
+            for path in fnwalk(src_path, checker):
                 path = to_unicode(path)
                 rel_path = os.path.relpath(path, self.base_path)
                 parent_path, name = os.path.split(rel_path)
@@ -225,6 +257,7 @@ class FSDBManager(object):
                 else:
                     fso = File.from_path(self.base_path, rel_path)
                 fso_id = self._update_fso_entry(fso, parent_id)
+                logging.debug('Updating db entry for "%s"' % rel_path)
                 if fso.is_dir():
                     id_cache[fso.rel_path] = fso_id
 
