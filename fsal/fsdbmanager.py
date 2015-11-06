@@ -37,7 +37,6 @@ class FSDBManager(object):
 
         self.base_path = base_path
         self.db = context['databases'].fs
-        self.last_op_time = self._read_last_op_time()
         blacklist = config['fsal.blacklist']
         sanitized_blacklist = []
         for p in blacklist:
@@ -162,7 +161,6 @@ class FSDBManager(object):
                 self.db.execute(q, (path,))
 
             logging.debug('Removing %d files/dirs' % (self.db.cursor.rowcount))
-            self._record_op_time()
         except Exception as e:
             msg = 'Exception while removing "%s": %s' % (fso.rel_path, str(e))
             logging.error(msg)
@@ -213,7 +211,6 @@ class FSDBManager(object):
             result = (path != self.base_path and not os.path.islink(path))
             rel_path = os.path.relpath(path, self.base_path)
             result = result and not self._is_blacklisted(rel_path)
-            result = result and os.path.getmtime(path) > self.last_op_time
             return result
 
         id_cache = FIFOCache(1024)
@@ -230,7 +227,6 @@ class FSDBManager(object):
                 fso_id = self._update_fso_entry(fso, parent_id)
                 if fso.is_dir():
                     id_cache[fso.rel_path] = fso_id
-        self._record_op_time()
 
     def _update_fso_entry(self, fso, parent_id=None):
         if not parent_id:
@@ -262,21 +258,6 @@ class FSDBManager(object):
     def _fso_row_iterator(self, cursor):
         for result in cursor:
             yield self._construct_fso(result)
-
-    def _read_last_op_time(self):
-        q = self.db.Select('op_time', sets=self.STATS_TABLE)
-        self.db.query(q)
-        op_time = self.db.result.op_time
-        # If the recorded op_time is greater than current time, assume
-        # system time was modified and revert to epoch time
-        if op_time > time.time():
-            op_time = 0.0
-        return op_time
-
-    def _record_op_time(self):
-        self.last_op_time = time.time()
-        q = self.db.Update(self.STATS_TABLE, op_time=':op_time')
-        self.db.query(q, op_time=self.last_op_time)
 
 
 class FIFOCache(object):
