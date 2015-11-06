@@ -87,7 +87,7 @@ class FSALServer(object):
         try:
             os.unlink(path)
         except OSError:
-            if(os.path.exists(path)):
+            if os.path.exists(path):
                 raise
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.bind(path)
