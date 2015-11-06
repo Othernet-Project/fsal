@@ -247,6 +247,8 @@ class FSDBManager(object):
             return result
 
         src_path = os.path.abspath(os.path.join(self.base_path, src_path))
+        if not os.path.exists(src_path):
+            return
         id_cache = FIFOCache(1024)
         with self.db.transaction():
             for path in fnwalk(src_path, checker):
