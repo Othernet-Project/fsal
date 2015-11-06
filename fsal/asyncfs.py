@@ -210,7 +210,8 @@ def move(src, dst):
     except OSError:
         if os.path.isdir(src):
             if _destinsrc(src, dst):
-                msg = "Cannot move a directory '%s' into itself '%s'." % (src, dst)
+                msg = "Cannot move a directory '%s' into itself '%s'." % (src,
+                                                                          dst)
                 raise Error(msg)
             copytree(src, real_dst, symlinks=True)
             rmtree(src)
