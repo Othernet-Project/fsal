@@ -127,20 +127,20 @@ class FSDBManager(object):
             return self._remove_fso(fso)
 
     def transfer(self, src, dest):
-        src_valid, src = self._validate_external_path(src)
+        src_valid, abs_src = self._validate_external_path(src)
         dest_valid, dest = self._validate_path(dest)
-        if not src_valid or not os.path.exists(src):
+        if not src_valid or not os.path.exists(abs_src) or self.exists(src):
             return (False, u'Invalid transfer source directory %s' % src)
         if not dest_valid:
             return (False, u'Invalid transfer destination directory %s' % dest)
 
         abs_dest = os.path.abspath(os.path.join(self.base_path, dest))
         logging.debug('Transferring content from "%s" to "%s"' %
-                      (src, abs_dest))
+                      (abs_src, abs_dest))
         msg = None
         success = True
         try:
-            asyncfs.move(src, abs_dest)
+            asyncfs.move(abs_src, abs_dest)
         except (asyncfs.Error, IOError) as e:
             logging.error('Error while transfering content: %s' % str(e))
             success = False
