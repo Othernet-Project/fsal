@@ -16,6 +16,8 @@ import gevent
 
 Error = Error
 
+SLEEP_INTERVAL = 0.001
+
 
 def copyfileobj(fsrc, fdst, buff_size=16*1024):
     """copy data from file-like object fsrc to file-like object fdst"""
@@ -24,7 +26,7 @@ def copyfileobj(fsrc, fdst, buff_size=16*1024):
         if not buf:
             break
         fdst.write(buf)
-        gevent.sleep(0)
+        gevent.sleep(SLEEP_INTERVAL)
 
 
 def copy(src, dst):
@@ -105,7 +107,7 @@ def copytree(src, dst, symlinks=False, ignore=None):
                 os.symlink(linkto, dstname)
             elif os.path.isdir(srcname):
                 copytree(srcname, dstname, symlinks, ignore)
-                gevent.sleep(0)
+                gevent.sleep(SLEEP_INTERVAL)
             else:
                 # Will raise a SpecialFileError for unsupported file types
                 copy(srcname, dstname)
@@ -165,10 +167,11 @@ def rmtree(path, ignore_errors=False, onerror=None):
             mode = 0
         if stat.S_ISDIR(mode):
             rmtree(fullname, ignore_errors, onerror)
-            gevent.sleep(0)
+            gevent.sleep(SLEEP_INTERVAL)
         else:
             try:
                 os.remove(fullname)
+                gevent.sleep(SLEEP_INTERVAL)
             except os.error:
                 onerror(os.remove, fullname, sys.exc_info())
     try:
