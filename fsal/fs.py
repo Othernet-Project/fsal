@@ -1,4 +1,5 @@
 import os
+import logging
 
 from datetime import datetime
 
@@ -66,12 +67,18 @@ class File(FSObject):
 
     @classmethod
     def from_path(cls, base_path, rel_path):
-        full_path = os.path.join(base_path, rel_path)
-        size = os.path.getsize(full_path)
-        create_date = datetime.fromtimestamp(os.path.getctime(full_path))
-        modify_date = datetime.fromtimestamp(os.path.getmtime(full_path))
-        return cls(base_path=base_path, rel_path=rel_path, size=size,
-                   create_date=create_date, modify_date=modify_date)
+        try:
+            full_path = os.path.join(base_path, rel_path)
+            stat = os.stat(full_path)
+            size = stat.st_size
+            create_date = datetime.fromtimestamp(stat.st_ctime)
+            modify_date = datetime.fromtimestamp(stat.st_mtime)
+            return cls(base_path=base_path, rel_path=rel_path, size=size,
+                       create_date=create_date, modify_date=modify_date)
+        except OSError as e:
+            msg = 'Error create File object from path %s: %s' % (rel_path,
+                                                                 str(e))
+            logging.error(msg)
 
     @classmethod
     def from_db_row(cls, base_path, row):
@@ -105,11 +112,17 @@ class Directory(FSObject):
 
     @classmethod
     def from_path(cls, base_path, rel_path):
-        full_path = os.path.join(base_path, rel_path)
-        create_date = datetime.fromtimestamp(os.path.getctime(full_path))
-        modify_date = datetime.fromtimestamp(os.path.getmtime(full_path))
-        return cls(base_path=base_path, rel_path=rel_path,
-                   create_date=create_date, modify_date=modify_date)
+        try:
+            full_path = os.path.join(base_path, rel_path)
+            stat = os.stat(full_path)
+            create_date = datetime.fromtimestamp(stat.st_ctime)
+            modify_date = datetime.fromtimestamp(stat.st_mtime)
+            return cls(base_path=base_path, rel_path=rel_path,
+                       create_date=create_date, modify_date=modify_date)
+        except OSError as e:
+            msg = 'Error create Directory object from path %s: %s' % (rel_path,
+                                                                      str(e))
+            logging.error(msg)
 
     @classmethod
     def from_db_row(cls, base_path, row):

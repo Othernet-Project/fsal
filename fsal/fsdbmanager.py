@@ -21,6 +21,16 @@ def sql_escape_path(path):
         path = path.replace(char, escaped_char)
     return path
 
+def checked_fnwalk(*args, **kwargs):
+    walk_gen = fnwalk(*args, **kwargs)
+    while True:
+        try:
+            yield next(walk_gen)
+        except StopIteration:
+            raise
+        except Exception as e:
+            logging.error('Error during fnwalk: %s' % str(e))
+
 
 class FSDBManager(object):
     FILE_TYPE = 0
@@ -251,7 +261,7 @@ class FSDBManager(object):
             return
         id_cache = FIFOCache(1024)
         with self.db.transaction():
-            for path in fnwalk(src_path, checker):
+            for path in checked_fnwalk(src_path, checker):
                 path = to_unicode(path)
                 rel_path = os.path.relpath(path, self.base_path)
                 parent_path, name = os.path.split(rel_path)
