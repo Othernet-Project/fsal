@@ -15,6 +15,7 @@ from shutil import Error, WindowsError, SpecialFileError
 import gevent
 
 Error = Error
+basename = _basename
 
 SLEEP_INTERVAL = 0.001
 

@@ -7,7 +7,7 @@ import time
 import collections
 from itertools import ifilter
 
-from .utils import fnwalk, to_unicode
+from .utils import fnwalk, to_unicode, to_bytes
 from .fs import File, Directory
 
 
@@ -20,6 +20,7 @@ def sql_escape_path(path):
     for char, escaped_char in SQL_WILDCARDS:
         path = path.replace(char, escaped_char)
     return path
+
 
 def checked_fnwalk(*args, **kwargs):
     walk_gen = fnwalk(*args, **kwargs)
@@ -40,6 +41,8 @@ class FSDBManager(object):
     STATS_TABLE = 'dbmgr_stats'
 
     ROOT_DIR_PATH = '.'
+
+    PATH_LEN_LIMIT = 32767
 
     def __init__(self, config, context):
         base_path = os.path.abspath(config['fsal.basepath'])
@@ -137,18 +140,14 @@ class FSDBManager(object):
             return self._remove_fso(fso)
 
     def transfer(self, src, dest):
-        src_valid, abs_src = self._validate_external_path(src)
-        dest_valid, dest = self._validate_path(dest)
-        if not src_valid or not os.path.exists(abs_src) or self.exists(src):
-            return (False, u'Invalid transfer source directory %s' % src)
-        if not dest_valid:
-            return (False, u'Invalid transfer destination directory %s' % dest)
+        success, msg = self._validate_transfer(src, dest)
+        if not success:
+            return (success, msg)
 
+        abs_src = os.path.abspath(src)
         abs_dest = os.path.abspath(os.path.join(self.base_path, dest))
         logging.debug('Transferring content from "%s" to "%s"' % (abs_src,
                                                                   abs_dest))
-        msg = None
-        success = True
         try:
             asyncfs.move(abs_src, abs_dest)
         except (asyncfs.Error, IOError) as e:
@@ -219,6 +218,31 @@ class FSDBManager(object):
     def _get_file(self, path):
         fso = self.get_fso(path)
         return fso if fso and fso.is_file() else None
+
+    def _validate_transfer(self, src, dest):
+        src_valid, abs_src = self._validate_external_path(src)
+        dest_valid, dest = self._validate_path(dest)
+        if not src_valid or not os.path.exists(abs_src) or self.exists(src):
+            return (False, u'Invalid transfer source directory %s' % src)
+        if not dest_valid:
+            return (False, u'Invalid transfer destination directory %s' % dest)
+
+        abs_dest = os.path.abspath(os.path.join(self.base_path, dest))
+        real_dst = abs_dest
+        if os.path.isdir(abs_dest):
+            real_dst = os.path.join(abs_dest, asyncfs.basename(abs_src))
+            if os.path.exists(real_dst):
+                return (False,
+                        'Destination path "%s" already exists' % real_dst)
+
+        for path in checked_fnwalk(abs_src, lambda p: True):
+            path = os.path.relpath(path, abs_src)
+            dest_path = os.path.abspath(os.path.join(real_dst, path))
+            if len(to_bytes(dest_path)) > self.PATH_LEN_LIMIT:
+                msg = '%s exceeds path length limit' % dest_path
+                return (False, msg)
+
+        return (True, None)
 
     def _refresh_db(self):
         start = time.time()
