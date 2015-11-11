@@ -9,6 +9,7 @@ from itertools import ifilter
 
 from .utils import fnwalk, to_unicode, to_bytes
 from .fs import File, Directory
+from .ondd import ONDDNotificationListener
 
 
 SQL_ESCAPE_CHAR = '\\'
@@ -59,11 +60,14 @@ class FSDBManager(object):
                 sanitized_blacklist.append(p)
         self.blacklist = sanitized_blacklist
 
+        self.notification_listener = ONDDNotificationListener(config, self._handle_notification)
+
     def start(self):
+        self.notification_listener.start()
         self._refresh_db()
 
     def stop(self):
-        pass
+        self.notification_listener.stop()
 
     def get_root_dir(self):
         try:
@@ -156,6 +160,10 @@ class FSDBManager(object):
             msg = str(e)
         self._update_db(dest)
         return (success, msg)
+
+    def _handle_notification(self, notification):
+        logging.debug("Notification received for %s" % notification.path)
+        self._update_db(notification.path)
 
     def _validate_path(self, path):
         if path is None or len(path.strip()) == 0:
@@ -281,12 +289,12 @@ class FSDBManager(object):
             return result
 
         src_path = os.path.abspath(os.path.join(self.base_path, src_path))
+        src_path = to_unicode(src_path)
         if not os.path.exists(src_path):
             return
         id_cache = FIFOCache(1024)
         with self.db.transaction():
             for path in checked_fnwalk(src_path, checker):
-                path = to_unicode(path)
                 rel_path = os.path.relpath(path, self.base_path)
                 parent_path, name = os.path.split(rel_path)
                 parent_id = id_cache[parent_path] if parent_path in id_cache else None
@@ -294,10 +302,12 @@ class FSDBManager(object):
                     fso = Directory.from_path(self.base_path, rel_path)
                 else:
                     fso = File.from_path(self.base_path, rel_path)
-                fso_id = self._update_fso_entry(fso, parent_id)
-                logging.debug('Updating db entry for "%s"' % rel_path)
-                if fso.is_dir():
-                    id_cache[fso.rel_path] = fso_id
+                old_fso = self.get_fso(rel_path)
+                if not old_fso or old_fso != fso:
+                    fso_id = self._update_fso_entry(fso, parent_id)
+                    logging.debug('Updating db entry for "%s"' % rel_path)
+                    if fso.is_dir():
+                        id_cache[fso.rel_path] = fso_id
 
     def _update_fso_entry(self, fso, parent_id=None):
         if not parent_id:

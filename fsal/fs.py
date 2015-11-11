@@ -39,6 +39,19 @@ class FSObject(object):
     def is_file(self):
         return False
 
+    def __eq__(self, other):
+        if isinstance(other, FSObject):
+            return (self.path == other.path and
+                    self.create_date == other.create_date and
+                    self.modify_date == other.modify_date)
+        return NotImplemented
+
+    def __ne__(self, other):
+        result = self.__eq__(other)
+        if result is NotImplemented:
+            return result
+        return not result
+
 
 class File(FSObject):
 
@@ -53,6 +66,18 @@ class File(FSObject):
     @property
     def size(self):
         return self._size
+
+    def __eq__(self, other):
+        if isinstance(other, File):
+            return (super(File, self).__eq__(other) and
+                    self.size == other.size)
+        return NotImplemented
+
+    def __ne__(self, other):
+        result = self.__eq__(other)
+        if result is NotImplemented:
+            return result
+        return not result
 
     @classmethod
     def from_xml(cls, base_path, file_xml):

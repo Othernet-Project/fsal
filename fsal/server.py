@@ -24,6 +24,8 @@ import logging.config
 from contextlib import contextmanager
 from os.path import join, dirname, abspath, normpath
 
+import gevent
+
 import xml.etree.ElementTree as ET
 from gevent.server import StreamServer
 
@@ -188,8 +190,8 @@ def main():
     def cleanup_wrapper(*args):
         cleanup(context)
 
-    signal.signal(signal.SIGINT, cleanup_wrapper)
-    signal.signal(signal.SIGTERM, cleanup_wrapper)
+    gevent.signal(signal.SIGINT, cleanup_wrapper)
+    gevent.signal(signal.SIGTERM, cleanup_wrapper)
 
     try:
         server.run()
