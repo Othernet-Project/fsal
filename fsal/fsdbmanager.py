@@ -162,8 +162,18 @@ class FSDBManager(object):
         return (success, msg)
 
     def _handle_notification(self, notification):
-        logging.debug("Notification received for %s" % notification.path)
-        self._update_db(notification.path)
+        path = notification.path
+        logging.debug("Notification received for %s" % path)
+        # Find the deepest parent in hierarchy which has been indexed
+        while path != '':
+            if not self.exists(path):
+                path = os.path.dirname(path)
+            else:
+                break
+        if path == '':
+            logging.warn("Cannot index path %s" % notification.path)
+            return
+        self._update_db(path)
 
     def _validate_path(self, path):
         if path is None or len(path.strip()) == 0:
@@ -291,6 +301,7 @@ class FSDBManager(object):
         src_path = os.path.abspath(os.path.join(self.base_path, src_path))
         src_path = to_unicode(src_path)
         if not os.path.exists(src_path):
+            logging.error('Cannot index "%s". Path does not exist' % src_path)
             return
         id_cache = FIFOCache(1024)
         with self.db.transaction():
