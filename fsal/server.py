@@ -72,11 +72,17 @@ class FSALServer(object):
             self.server.stop()
 
     def request_handler(self, sock, address):
-        request_data = parsestring(self.read_request(sock)).request
-        command_data = request_data.command
-        handler = self.handler_factory.create_handler(command_data)
-        if handler.is_synchronous:
-            self.send_response(sock, handler.do_command())
+        try:
+            request_data = parsestring(self.read_request(sock)).request
+            command_data = request_data.command
+            handler = self.handler_factory.create_handler(command_data)
+            if handler.is_synchronous:
+                self.send_response(sock, handler.do_command())
+        except socket.error as e:
+            logging.exception("Unable to send command response: %s" % str(e))
+        except Exception as e:
+            logging.exception("Unexpected exception while handling command")
+
 
     def send_response(self, sock, response_data):
         response = self.response_factory.create_response(response_data)
