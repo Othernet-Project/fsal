@@ -76,6 +76,16 @@ def add_file_node(parent_node, fso):
     modify_timestamp_node.text = to_unicode(to_timestamp(fso.modify_date))
 
 
+def add_event_node(parent_node, event):
+    event_node = SubElement(parent_node, u'event')
+    type_node = SubElement(event_node, u'type')
+    type_node.text = to_unicode(event.event_type)
+    src_node = SubElement(event_node, u'src')
+    src_node.text = to_unicode(event.src)
+    is_dir_node = SubElement(event_node, u'is_dir')
+    is_dir_node.text = to_unicode(event.is_dir).lower()
+
+
 class DirectoryListingResponse(GenericResponse):
 
     def get_xml(self):
@@ -153,12 +163,24 @@ class GetFSOResponse(GenericResponse):
         return root
 
 
+class GetChangesResponse(GenericResponse):
+
+    def get_xml(self):
+        root = create_response_xml_root()
+        result_node = SubElement(root, u'result')
+        events_node = SubElement(result_node, u'events')
+        for e in self.response_data['params']['events']:
+            add_event_node(events_node, e)
+        return root
+
+
 class CommandResponseFactory:
     default_response_generator = GenericResponse
     response_map = {
         commandtypes.COMMAND_TYPE_LIST_DIR: DirectoryListingResponse,
         commandtypes.COMMAND_TYPE_SEARCH: SearchResponse,
         commandtypes.COMMAND_TYPE_GET_FSO: GetFSOResponse,
+        commandtypes.COMMAND_TYPE_GET_CHANGES: GetChangesResponse,
     }
 
     def create_response(self, response_data):

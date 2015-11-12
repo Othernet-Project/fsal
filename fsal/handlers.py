@@ -188,6 +188,16 @@ class TransferCommandHandler(CommandHandler):
         return self.send_result(success=success, params=params)
 
 
+class GetChangesCommandHandler(CommandHandler):
+    command_type = commandtypes.COMMAND_TYPE_GET_CHANGES
+
+    def do_command(self):
+        limit = self.command_data.params.limit.data
+        events = self.fs_mgr.get_changes(limit)
+        params = {'events': events}
+        return self.send_result(success=True, params=params)
+
+
 class CommandHandlerFactory(object):
 
     def __init__(self, context):

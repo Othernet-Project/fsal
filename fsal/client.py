@@ -8,6 +8,8 @@ from xml.etree.ElementTree import Element, SubElement, tostring
 
 from . import commandtypes
 from .fs import File, Directory
+from .events import event_from_xml
+from .utils import to_unicode
 from .serialize import str_to_bool, bool_to_str, singular_name
 
 
@@ -26,7 +28,7 @@ def build_request_xml(command, params):
         if isinstance(value, list):
             add_list_xml(value, param_node)
         else:
-            param_node.text = value
+            param_node.text = to_unicode(value)
     return root
 
 
@@ -165,6 +167,14 @@ class FSAL(object):
         error = error_node.text
         return (success, error)
 
+    def _parse_get_changes_response(self, response_xml):
+        events = []
+        events_node = response_xml.find('.//events')
+        for child in events_node:
+            events.append(event_from_xml(child))
+        return events
+
+
     @command(commandtypes.COMMAND_TYPE_LIST_DIR, _parse_list_dir_response)
     def list_dir(self, path):
         return {'path': path}
@@ -198,3 +208,7 @@ class FSAL(object):
     @command(commandtypes.COMMAND_TYPE_TRANSFER, _parse_transfer_response)
     def transfer(self, src, dest):
         return {'src': src, 'dest': dest}
+
+    @command(commandtypes.COMMAND_TYPE_GET_CHANGES, _parse_get_changes_response)
+    def get_changes(self, limit=100):
+        return {'limit': limit}

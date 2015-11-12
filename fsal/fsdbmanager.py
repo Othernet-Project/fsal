@@ -10,6 +10,8 @@ from itertools import ifilter
 from .utils import fnwalk, to_unicode, to_bytes
 from .fs import File, Directory
 from .ondd import ONDDNotificationListener
+from .events import FileCreatedEvent, FileDeletedEvent, FileModifiedEvent, \
+    DirCreatedEvent, DirModifiedEvent, DirDeletedEvent, FileSystemEventQueue
 
 
 SQL_ESCAPE_CHAR = '\\'
@@ -61,6 +63,8 @@ class FSDBManager(object):
         self.blacklist = sanitized_blacklist
 
         self.notification_listener = ONDDNotificationListener(config, self._handle_notification)
+
+        self.event_queue = FileSystemEventQueue(config, context)
 
     def start(self):
         self.notification_listener.start()
@@ -161,6 +165,9 @@ class FSDBManager(object):
         self._update_db(dest)
         return (success, msg)
 
+    def get_changes(self, limit=100):
+        return self.event_queue.popitems(limit)
+
     def _handle_notification(self, notification):
         path = notification.path
         logging.debug("Notification received for %s" % path)
@@ -206,10 +213,22 @@ class FSDBManager(object):
         fso.__id = row.id
         return fso
 
-    def _remove_fso(self, fso):
+    def _remove_from_fs(self, fso):
+        events = []
+        for p in checked_fnwalk(fso.path, lambda: True):
+            rel_p = os.path.relpath(p, self.base_path)
+            if os.path.isdir(p):
+                event = DirDeletedEvent(rel_p)
+            else:
+                event = FileDeletedEvent(rel_p)
+            events.append(event)
         remover = shutil.rmtree if fso.is_dir() else os.remove
+        remover(fso.path)
+        return events
+
+    def _remove_fso(self, fso):
         try:
-            remover(fso.path)
+            events = self._remove_from_fs(fso)
             path = sql_escape_path(fso.rel_path)
             q = self.db.Delete(self.FS_TABLE)
             q.where = 'path LIKE ? ESCAPE "%s"' % SQL_ESCAPE_CHAR
@@ -218,7 +237,7 @@ class FSDBManager(object):
                 self.db.executemany(q, (((pattern % path),), (path,)))
             else:
                 self.db.execute(q, (path,))
-
+            self.event_queue.additems(events)
             logging.debug('Removing %d files/dirs' % (self.db.cursor.rowcount))
         except Exception as e:
             msg = 'Exception while removing "%s": %s' % (fso.rel_path, str(e))
@@ -290,6 +309,15 @@ class FSDBManager(object):
     def _remove_paths(self, paths):
         q = self.db.Delete(self.FS_TABLE, where='path = ?')
         self.db.executemany(q, ((p,) for p in paths))
+        events = []
+        for p in paths:
+            abs_p = os.path.abspath(os.path.join(self.base_path, p))
+            if os.path.isdir(abs_p):
+                event = DirDeletedEvent(p)
+            else:
+                event = FileDeletedEvent(p)
+            events.append(event)
+        self.event_queue.additems(events)
 
     def _update_db(self, src_path=ROOT_DIR_PATH):
         def checker(path):
@@ -314,13 +342,19 @@ class FSDBManager(object):
                 else:
                     fso = File.from_path(self.base_path, rel_path)
                 old_fso = self.get_fso(rel_path)
+                if not old_fso:
+                    event_cls = DirCreatedEvent if fso.is_dir() else FileCreatedEvent
+                elif old_fso != fso:
+                    event_cls = DirModifiedEvent if fso.is_dir() else FileModifiedEvent
                 if not old_fso or old_fso != fso:
-                    fso_id = self._update_fso_entry(fso, parent_id)
+                    if event_cls:
+                        self.event_queue.add(event_cls(rel_path))
+                    fso_id = self._update_fso_entry(fso, parent_id, old_fso)
                     logging.debug('Updating db entry for "%s"' % rel_path)
                     if fso.is_dir():
                         id_cache[fso.rel_path] = fso_id
 
-    def _update_fso_entry(self, fso, parent_id=None):
+    def _update_fso_entry(self, fso, parent_id=None, old_entry=None):
         if not parent_id:
             parent, name = os.path.split(fso.rel_path)
             parent_dir = self._get_dir(parent)
@@ -333,10 +367,9 @@ class FSDBManager(object):
         type = self.DIR_TYPE if fso.is_dir() else self.FILE_TYPE
         values = [parent_id, type, fso.name, size, fso.create_date,
                   fso.modify_date, fso.rel_path]
-        entry = self.get_fso(fso.rel_path)
-        if entry:
+        if old_entry:
             cols.append('id')
-            values.append(entry.__id)
+            values.append(old_entry.__id)
         self.db.execute(q, values)
         q = self.db.Select('last_insert_rowid() as id')
         self.db.execute(q)
