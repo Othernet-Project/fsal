@@ -33,18 +33,6 @@ def read(fname):
     return content
 
 
-def read_reqs(fname):
-    return read(fname).strip().split('\n')
-
-
-def in_scriptdir(path):
-    return os.path.join(SCRIPTDIR, os.path.normpath(path))
-
-
-REQPATH = in_scriptdir('conf/requirements.txt')
-DEPS = read_reqs(REQPATH)
-
-
 def clean_pyc():
     print("cleaning up cached files in '%s'" % SCRIPTDIR)
     for root, dirs, files in os.walk(SCRIPTDIR):
@@ -91,13 +79,19 @@ setup(
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3.4',
     ],
-    entry_points = {
+    entry_points={
         'console_scripts': [
             'fsal = fsal.server:main',
             'fsal-daemon = fsal.daemon:main'
         ],
     },
-    install_requires=DEPS,
+    install_requires=[
+        'gevent>=1.0.1',
+        'python-dateutil>=2.4.2',
+        'scandir>=0.9',
+        'sqlize>=0.1',
+        'setuptools',
+    ],
     cmdclass={
         'develop': Develop,
         'sdist': Package,
