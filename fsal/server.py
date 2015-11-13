@@ -134,7 +134,7 @@ def configure_logging(config):
         'version': 1,
         'root': {
             'handlers': ['file', 'console'],
-            'level': logging.DEBUG,
+            'level': config['logging.level'],
         },
         'handlers': {
             'file': {
