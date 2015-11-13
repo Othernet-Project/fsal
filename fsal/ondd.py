@@ -65,7 +65,7 @@ class ONDDNotificationListener(object):
             logging.warn('Error parsing notification %s' % notification_str)
             return
 
-        if root.tag != 'notification':
+        if root.tag != 'notice':
             logging.warn('Unknown message format received %s' % notification_str)
             return
         notification = self.event_factory.create_event(root)
