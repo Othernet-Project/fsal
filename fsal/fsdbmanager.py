@@ -70,7 +70,7 @@ class FSDBManager(object):
 
         self.notification_listener = ONDDNotificationListener(config, self._handle_notification)
         self.event_queue = FileSystemEventQueue(config, context)
-        self.scheduler = TaskScheduler(0)
+        self.scheduler = TaskScheduler(0.2)
 
     def start(self):
         self.notification_listener.start()
@@ -174,15 +174,9 @@ class FSDBManager(object):
 
         # Find the deepest parent in hierarchy which has been indexed
         path = os.path.relpath(real_dst, self.base_path)
-        while path != '':
-            parent = os.path.dirname(path)
-            if self.exists(parent):
-                break
-            path = parent
-        if path == '':
-            path = self.ROOT_DIR_PATH
+        path = self._deepest_indexed_parent(path)
         logging.debug('Indexing %s' % path)
-        self._update_db_async(path)
+        self._update_db(path)
         return (success, msg)
 
     def get_changes(self, limit=100):
@@ -200,6 +194,7 @@ class FSDBManager(object):
         if path == '':
             logging.warn("Cannot index path %s" % notification.path)
             return
+        path = self._deepest_indexed_parent(path)
         self._update_db_async(path)
 
     def _validate_path(self, path):
@@ -222,6 +217,16 @@ class FSDBManager(object):
             path = path.rstrip(os.sep)
             full_path = os.path.abspath(path)
             return (True, full_path)
+
+    def _deepest_indexed_parent(self, path):
+        while path != '':
+            parent = os.path.dirname(path)
+            if self.exists(parent):
+                break
+            path = parent
+        if path == '':
+            path = self.ROOT_DIR_PATH
+        return path
 
     def _is_blacklisted(self, path):
         return any([path.startswith(p) for p in self.blacklist])
@@ -322,8 +327,8 @@ class FSDBManager(object):
             if not os.path.exists(full_path) or self._is_blacklisted(path):
                 logging.debug('Removing db entry for "%s"' % path)
                 removed_paths.append(path)
-                gevent.sleep(self.SLEEP_INTERVAL)
             if len(removed_paths) >= batch_size:
+                gevent.sleep(self.SLEEP_INTERVAL)
                 self._remove_paths(removed_paths)
                 removed_paths = []
         if len(removed_paths) >= 0:
