@@ -8,6 +8,8 @@ This software is free software licensed under the terms of GPLv3. See COPYING
 file that comes with the source code, or http://www.gnu.org/licenses/gpl.txt.
 """
 
+import logging
+
 from .serialize import str_to_bool
 
 
@@ -120,17 +122,24 @@ class FileSystemEventQueue(object):
         values = ((e.event_type, e.src, e.is_dir) for e in events)
         self.db.executemany(q, values)
 
-    def popitems(self, maxnum=100):
+    def getitems(self, maxnum=100):
         items = []
         with self.db.transaction():
-            ids = []
-            q = self.db.Select(what='*', sets=self.EVENTS_TABLE, limit=maxnum)
+            q = self.db.Select(what='*', sets=self.EVENTS_TABLE, limit=maxnum,
+                               order='id')
             cursor = self.db.query(q)
             for row in cursor:
                 items.append(event_from_row(row))
+        return items
+
+    def delitems(self, num):
+        with self.db.transaction():
+            ids = []
+            q = self.db.Select(what='id', sets=self.EVENTS_TABLE, limit=num,
+                               order='id')
+            cursor = self.db.query(q)
+            for row in cursor:
                 ids.append(row.id)
             q = self.db.Delete(self.EVENTS_TABLE, where='id = ?')
             self.db.executemany(q, ((id,) for id in ids))
-        return items
-
-
+            logging.debug('Cleared %d events' % num)

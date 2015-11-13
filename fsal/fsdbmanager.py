@@ -180,7 +180,10 @@ class FSDBManager(object):
         return (success, msg)
 
     def get_changes(self, limit=100):
-        return self.event_queue.popitems(limit)
+        return self.event_queue.getitems(limit)
+
+    def confirm_changes(self, limit=100):
+        return self.event_queue.delitems(limit)
 
     def _handle_notification(self, notification):
         path = notification.path
@@ -328,7 +331,6 @@ class FSDBManager(object):
                 logging.debug('Removing db entry for "%s"' % path)
                 removed_paths.append(path)
             if len(removed_paths) >= batch_size:
-                gevent.sleep(self.SLEEP_INTERVAL)
                 self._remove_paths(removed_paths)
                 removed_paths = []
         if len(removed_paths) >= 0:

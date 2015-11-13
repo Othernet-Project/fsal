@@ -192,10 +192,19 @@ class GetChangesCommandHandler(CommandHandler):
     command_type = commandtypes.COMMAND_TYPE_GET_CHANGES
 
     def do_command(self):
-        limit = self.command_data.params.limit.data
+        limit = int(self.command_data.params.limit.data)
         events = self.fs_mgr.get_changes(limit)
         params = {'events': events}
         return self.send_result(success=True, params=params)
+
+
+class ConfirmChangesCommandHandler(CommandHandler):
+    command_type = commandtypes.COMMAND_TYPE_CONFIRM_CHANGES
+
+    def do_command(self):
+        limit = int(self.command_data.params.limit.data)
+        self.fs_mgr.confirm_changes(limit)
+        return self.send_result(success=True, params={})
 
 
 class CommandHandlerFactory(object):
