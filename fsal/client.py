@@ -4,7 +4,6 @@ import functools
 import socket
 
 import xml.etree.ElementTree as ET
-from contextlib import contextmanager
 from xml.etree.ElementTree import Element, SubElement, tostring
 
 from . import commandtypes
@@ -175,6 +174,9 @@ class FSAL(object):
             events.append(event_from_xml(child))
         return events
 
+    def _parse_confirm_changes_response(self, response_xml):
+        return None
+
     @command(commandtypes.COMMAND_TYPE_LIST_DIR, _parse_list_dir_response)
     def list_dir(self, path):
         return {'path': path}
@@ -209,19 +211,17 @@ class FSAL(object):
     def transfer(self, src, dest):
         return {'src': src, 'dest': dest}
 
-    @contextmanager
     def get_changes(self, limit=100):
-        try:
-            yield self._get_changes_helper(limit)
-            self.confirm_changes(limit)
-        except:
-            raise
+        for e in self._get_changes_helper(limit):
+            yield e
+        self.confirm_changes(limit)
 
     @command(commandtypes.COMMAND_TYPE_GET_CHANGES, _parse_get_changes_response)
     def _get_changes_helper(self, limit=100):
         return {'limit': limit}
 
-    @command(commandtypes.COMMAND_TYPE_CONFIRM_CHANGES, None)
+    @command(commandtypes.COMMAND_TYPE_CONFIRM_CHANGES,
+             _parse_confirm_changes_response)
     def confirm_changes(self, limit):
         return {'limit': limit}
 
