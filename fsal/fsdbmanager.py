@@ -176,7 +176,7 @@ class FSDBManager(object):
         path = os.path.relpath(real_dst, self.base_path)
         path = self._deepest_indexed_parent(path)
         logging.debug('Indexing %s' % path)
-        self._update_db(path)
+        self._update_db_async(path)
         return (success, msg)
 
     def get_changes(self, limit=100):
