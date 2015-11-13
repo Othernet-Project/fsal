@@ -91,6 +91,11 @@ setup(
         'scandir>=0.9',
         'sqlize>=0.1',
         'setuptools',
+        'librarian_core'
+    ],
+    dependency_links=[
+        'git+ssh://git@github.com/Outernet-Project/librarian-core.git#egg=librarian_core-0.1',
+        'git+ssh://git@github.com/Outernet-Project/librarian-content.git#egg=librarian_content-0.1',
     ],
     cmdclass={
         'develop': Develop,

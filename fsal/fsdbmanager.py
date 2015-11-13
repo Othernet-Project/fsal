@@ -7,11 +7,15 @@ import time
 import collections
 from itertools import ifilter
 
+import gevent
+
 from .utils import fnwalk, to_unicode, to_bytes
 from .fs import File, Directory
 from .ondd import ONDDNotificationListener
 from .events import FileCreatedEvent, FileDeletedEvent, FileModifiedEvent, \
     DirCreatedEvent, DirModifiedEvent, DirDeletedEvent, FileSystemEventQueue
+
+from librarian_core.contrib.tasks.scheduler import TaskScheduler
 
 
 SQL_ESCAPE_CHAR = '\\'
@@ -47,6 +51,8 @@ class FSDBManager(object):
 
     PATH_LEN_LIMIT = 32767
 
+    SLEEP_INTERVAL = 0.0001
+
     def __init__(self, config, context):
         base_path = os.path.abspath(config['fsal.basepath'])
         if not os.path.isdir(base_path):
@@ -63,12 +69,12 @@ class FSDBManager(object):
         self.blacklist = sanitized_blacklist
 
         self.notification_listener = ONDDNotificationListener(config, self._handle_notification)
-
         self.event_queue = FileSystemEventQueue(config, context)
+        self.scheduler = TaskScheduler(0)
 
     def start(self):
         self.notification_listener.start()
-        self._refresh_db()
+        self._refresh_db_async()
 
     def stop(self):
         self.notification_listener.stop()
@@ -176,7 +182,7 @@ class FSDBManager(object):
         if path == '':
             path = self.ROOT_DIR_PATH
         logging.debug('Indexing %s' % path)
-        self._update_db(path)
+        self._update_db_async(path)
         return (success, msg)
 
     def get_changes(self, limit=100):
@@ -194,7 +200,7 @@ class FSDBManager(object):
         if path == '':
             logging.warn("Cannot index path %s" % notification.path)
             return
-        self._update_db(path)
+        self._update_db_async(path)
 
     def _validate_path(self, path):
         if path is None or len(path.strip()) == 0:
@@ -295,6 +301,9 @@ class FSDBManager(object):
 
         return (True, None)
 
+    def _refresh_db_async(self):
+        self.scheduler.schedule(self._refresh_db)
+
     def _refresh_db(self):
         start = time.time()
         self._prune_db()
@@ -303,22 +312,22 @@ class FSDBManager(object):
         logging.debug('DB refreshed in %0.3f ms' % ((end - start) * 1000))
 
     def _prune_db(self, batch_size=1000):
-        with self.db.transaction():
-            q = self.db.Select('path', sets=self.FS_TABLE)
-            self.db.query(q)
-            cursor = self.db.drop_cursor()
-            removed_paths = []
-            for result in cursor:
-                path = result.path
-                full_path = os.path.join(self.base_path, path)
-                if not os.path.exists(full_path) or self._is_blacklisted(path):
-                    logging.debug('Removing db entry for "%s"' % path)
-                    removed_paths.append(path)
-                if len(removed_paths) >= batch_size:
-                    self._remove_paths(removed_paths)
-                    removed_paths = []
-            if len(removed_paths) >= 0:
+        q = self.db.Select('path', sets=self.FS_TABLE)
+        self.db.query(q)
+        cursor = self.db.drop_cursor()
+        removed_paths = []
+        for result in cursor:
+            path = result.path
+            full_path = os.path.join(self.base_path, path)
+            if not os.path.exists(full_path) or self._is_blacklisted(path):
+                logging.debug('Removing db entry for "%s"' % path)
+                removed_paths.append(path)
+                gevent.sleep(self.SLEEP_INTERVAL)
+            if len(removed_paths) >= batch_size:
                 self._remove_paths(removed_paths)
+                removed_paths = []
+        if len(removed_paths) >= 0:
+            self._remove_paths(removed_paths)
 
     def _remove_paths(self, paths):
         q = self.db.Delete(self.FS_TABLE, where='path = ?')
@@ -333,6 +342,9 @@ class FSDBManager(object):
             events.append(event)
         self.event_queue.additems(events)
 
+    def _update_db_async(self, src_path=ROOT_DIR_PATH):
+        self.scheduler.schedule(self._update_db, args=(src_path,))
+
     def _update_db(self, src_path=ROOT_DIR_PATH):
         def checker(path):
             result = (path != self.base_path and not os.path.islink(path))
@@ -346,8 +358,12 @@ class FSDBManager(object):
             logging.error('Cannot index "%s". Path does not exist' % src_path)
             return
         id_cache = FIFOCache(1024)
-        with self.db.transaction():
+        batch_size = 3000
+        count = 0
+        try:
             for path in checked_fnwalk(src_path, checker):
+                if count == 0:
+                    self.db.execute('BEGIN;')
                 rel_path = os.path.relpath(path, self.base_path)
                 parent_path, name = os.path.split(rel_path)
                 parent_id = id_cache[parent_path] if parent_path in id_cache else None
@@ -367,6 +383,16 @@ class FSDBManager(object):
                     logging.debug('Updating db entry for "%s"' % rel_path)
                     if fso.is_dir():
                         id_cache[fso.rel_path] = fso_id
+                count += 1
+                if count == batch_size:
+                    self.db.commit()
+                    gevent.sleep(self.SLEEP_INTERVAL)
+                    count = 0
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            logging.exception('Exception while indexing "%s"' % src_path)
+
 
     def _update_fso_entry(self, fso, parent_id=None, old_entry=None):
         if not parent_id:
