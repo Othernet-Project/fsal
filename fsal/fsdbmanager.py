@@ -156,13 +156,27 @@ class FSDBManager(object):
         abs_dest = os.path.abspath(os.path.join(self.base_path, dest))
         logging.debug('Transferring content from "%s" to "%s"' % (abs_src,
                                                                   abs_dest))
+        real_dst = abs_dest
+        if os.path.isdir(real_dst):
+            real_dst = os.path.join(real_dst, asyncfs.basename(abs_src))
         try:
             asyncfs.move(abs_src, abs_dest)
         except (asyncfs.Error, IOError) as e:
             logging.error('Error while transfering content: %s' % str(e))
             success = False
             msg = str(e)
-        self._update_db(dest)
+
+        # Find the deepest parent in hierarchy which has been indexed
+        path = os.path.relpath(real_dst, self.base_path)
+        while path != '':
+            parent = os.path.dirname(path)
+            if self.exists(parent):
+                break
+            path = parent
+        if path == '':
+            path = self.ROOT_DIR_PATH
+        logging.debug('Indexing %s' % path)
+        self._update_db(path)
         return (success, msg)
 
     def get_changes(self, limit=100):
