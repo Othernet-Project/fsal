@@ -30,14 +30,11 @@ def sql_escape_path(path):
 
 
 def checked_fnwalk(*args, **kwargs):
-    walk_gen = fnwalk(*args, **kwargs)
-    while True:
-        try:
-            yield next(walk_gen)
-        except StopIteration:
-            raise
-        except Exception as e:
-            logging.error('Error during fnwalk: %s' % str(e))
+    try:
+        for entry in fnwalk(*args, **kwargs):
+            yield entry
+    except Exception as e:
+        logging.error('Error during fnwalk: %s' % str(e))
 
 
 class FSDBManager(object):
@@ -243,12 +240,13 @@ class FSDBManager(object):
 
     def _remove_from_fs(self, fso):
         events = []
-        for p in checked_fnwalk(fso.path, lambda: True):
-            rel_p = os.path.relpath(p, self.base_path)
-            if os.path.isdir(p):
-                event = DirDeletedEvent(rel_p)
+        for entry in checked_fnwalk(fso.path, lambda: True):
+            path = entry.path
+            rel_path = os.path.relpath(path, self.base_path)
+            if e.is_dir():
+                event = DirDeletedEvent(rel_path)
             else:
-                event = FileDeletedEvent(rel_p)
+                event = FileDeletedEvent(rel_path)
             events.append(event)
         remover = shutil.rmtree if fso.is_dir() else os.remove
         remover(fso.path)
@@ -300,7 +298,8 @@ class FSDBManager(object):
                 return (False,
                         'Destination path "%s" already exists' % real_dst)
 
-        for path in checked_fnwalk(abs_src, lambda p: True):
+        for entry in checked_fnwalk(abs_src, lambda p: True):
+            path = entry.path
             path = os.path.relpath(path, abs_src)
             dest_path = os.path.abspath(os.path.join(real_dst, path))
             if len(to_bytes(dest_path)) > self.PATH_LEN_LIMIT:
@@ -353,8 +352,9 @@ class FSDBManager(object):
         self.scheduler.schedule(self._update_db, args=(src_path,))
 
     def _update_db(self, src_path=ROOT_DIR_PATH):
-        def checker(path):
-            result = (path != self.base_path and not os.path.islink(path))
+        def checker(entry):
+            path = entry.path
+            result = (path != self.base_path and not entry.is_symlink())
             rel_path = os.path.relpath(path, self.base_path)
             result = result and not self._is_blacklisted(rel_path)
             return result
@@ -368,11 +368,12 @@ class FSDBManager(object):
         batch_size = 3000
         count = 0
         try:
-            for path in checked_fnwalk(src_path, checker):
+            for entry in checked_fnwalk(src_path, checker):
+                path = entry.path
                 if count == 0:
                     self.db.execute('BEGIN;')
                 rel_path = os.path.relpath(path, self.base_path)
-                parent_path, name = os.path.split(rel_path)
+                parent_path = os.path.dirname(rel_path)
                 parent_id = id_cache[parent_path] if parent_path in id_cache else None
                 if os.path.isdir(path):
                     fso = Directory.from_path(self.base_path, rel_path)

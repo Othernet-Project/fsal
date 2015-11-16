@@ -40,23 +40,25 @@ def fnwalk(path, fn, shallow=False):
     ``bar``, with ``shallow`` flag set to ``True``, only ``/foo/bar`` is
     matched. Otherwise, both ``/foo/bar`` and ``/foo/bar/bar`` are matched.
     """
-    if fn(path):
+    if hasattr(path, 'path') and fn(path):
         yield path
         if shallow:
             return
 
     try:
+        entries = scandir.scandir(path.path)
+    except AttributeError:
         entries = scandir.scandir(path)
     except OSError:
         return
 
     for entry in entries:
         if entry.is_dir():
-            for child in fnwalk(entry.path, fn, shallow):
+            for child in fnwalk(entry, fn, shallow):
                 yield child
         else:
-            if fn(entry.path):
-                yield entry.path
+            if fn(entry):
+                yield entry
 
 
 def validate_path(base_path, path):
