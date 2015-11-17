@@ -95,15 +95,19 @@ class File(FSObject):
         try:
             full_path = os.path.join(base_path, rel_path)
             stat = os.stat(full_path)
-            size = stat.st_size
-            create_date = datetime.fromtimestamp(stat.st_ctime)
-            modify_date = datetime.fromtimestamp(stat.st_mtime)
-            return cls(base_path=base_path, rel_path=rel_path, size=size,
-                       create_date=create_date, modify_date=modify_date)
+            return cls.from_stat(base_path, rel_path, stat)
         except OSError as e:
             msg = 'Error create File object from path %s: %s' % (rel_path,
                                                                  str(e))
             logging.error(msg)
+
+    @classmethod
+    def from_stat(cls, base_path, rel_path, stat):
+        size = stat.st_size
+        create_date = datetime.fromtimestamp(stat.st_ctime)
+        modify_date = datetime.fromtimestamp(stat.st_mtime)
+        return cls(base_path=base_path, rel_path=rel_path, size=size,
+                    create_date=create_date, modify_date=modify_date)
 
     @classmethod
     def from_db_row(cls, base_path, row):
@@ -140,6 +144,15 @@ class Directory(FSObject):
         try:
             full_path = os.path.join(base_path, rel_path)
             stat = os.stat(full_path)
+            return cls.from_stat(base_path, rel_path, stat)
+        except OSError as e:
+            msg = 'Error create Directory object from path %s: %s' % (rel_path,
+                                                                      str(e))
+            logging.error(msg)
+
+    @classmethod
+    def from_stat(cls, base_path, rel_path, stat):
+        try:
             create_date = datetime.fromtimestamp(stat.st_ctime)
             modify_date = datetime.fromtimestamp(stat.st_mtime)
             return cls(base_path=base_path, rel_path=rel_path,
@@ -148,6 +161,7 @@ class Directory(FSObject):
             msg = 'Error create Directory object from path %s: %s' % (rel_path,
                                                                       str(e))
             logging.error(msg)
+
 
     @classmethod
     def from_db_row(cls, base_path, row):

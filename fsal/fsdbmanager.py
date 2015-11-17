@@ -8,6 +8,7 @@ import collections
 from itertools import ifilter
 
 import gevent
+import scandir
 
 from .utils import fnwalk, to_unicode, to_bytes
 from .fs import File, Directory
@@ -29,12 +30,17 @@ def sql_escape_path(path):
     return path
 
 
-def checked_fnwalk(*args, **kwargs):
+def checked_fnwalk(path, fn, shallow=False):
     try:
-        for entry in fnwalk(*args, **kwargs):
+        parent, name = os.path.split(path)
+        path = scandir.GenericDirEntry(parent, name)
+        if fn(path):
+            yield path
+
+        for entry in fnwalk(path, fn, shallow):
             yield entry
     except Exception as e:
-        logging.error('Error during fnwalk: %s' % str(e))
+        logging.exception('Error during fnwalk: %s' % str(e))
 
 
 class FSDBManager(object):
@@ -243,7 +249,7 @@ class FSDBManager(object):
         for entry in checked_fnwalk(fso.path, lambda: True):
             path = entry.path
             rel_path = os.path.relpath(path, self.base_path)
-            if e.is_dir():
+            if entry.is_dir():
                 event = DirDeletedEvent(rel_path)
             else:
                 event = FileDeletedEvent(rel_path)
@@ -375,10 +381,10 @@ class FSDBManager(object):
                 rel_path = os.path.relpath(path, self.base_path)
                 parent_path = os.path.dirname(rel_path)
                 parent_id = id_cache[parent_path] if parent_path in id_cache else None
-                if os.path.isdir(path):
-                    fso = Directory.from_path(self.base_path, rel_path)
+                if entry.is_dir():
+                    fso = Directory.from_stat(self.base_path, rel_path, entry.stat())
                 else:
-                    fso = File.from_path(self.base_path, rel_path)
+                    fso = File.from_stat(self.base_path, rel_path, entry.stat())
                 old_fso = self.get_fso(rel_path)
                 if not old_fso:
                     event_cls = DirCreatedEvent if fso.is_dir() else FileCreatedEvent
