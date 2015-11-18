@@ -329,16 +329,24 @@ class FSDBManager(object):
         self.db.query(q)
         cursor = self.db.drop_cursor()
         removed_paths = []
+        counter = 0
+        iter_max = 1000
         for result in cursor:
+            counter += 1
+            if counter >= iter_max:
+                gevent.sleep(self.SLEEP_INTERVAL)
+                counter = 0
             path = result.path
             full_path = os.path.join(self.base_path, path)
             if not os.path.exists(full_path) or self._is_blacklisted(path):
                 logging.debug('Removing db entry for "%s"' % path)
                 removed_paths.append(path)
             if len(removed_paths) >= batch_size:
+                gevent.sleep(self.SLEEP_INTERVAL)
                 self._remove_paths(removed_paths)
                 removed_paths = []
         if len(removed_paths) >= 0:
+            gevent.sleep(self.SLEEP_INTERVAL)
             self._remove_paths(removed_paths)
 
     def _remove_paths(self, paths):
