@@ -54,7 +54,7 @@ class FSDBManager(object):
 
     PATH_LEN_LIMIT = 32767
 
-    SLEEP_INTERVAL = 0.010
+    SLEEP_INTERVAL = 0.500
 
     def __init__(self, config, context):
         base_path = os.path.abspath(config['fsal.basepath'])
@@ -384,7 +384,7 @@ class FSDBManager(object):
             logging.error('Cannot index "%s". Path does not exist' % src_path)
             return
         id_cache = FIFOCache(1024)
-        batch_size = 3000
+        batch_size = 1000
         count = 0
         try:
             for entry in checked_fnwalk(src_path, checker):
