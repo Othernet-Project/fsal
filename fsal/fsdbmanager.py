@@ -54,7 +54,7 @@ class FSDBManager(object):
 
     PATH_LEN_LIMIT = 32767
 
-    SLEEP_INTERVAL = 0.0001
+    SLEEP_INTERVAL = 0.010
 
     def __init__(self, config, context):
         base_path = os.path.abspath(config['fsal.basepath'])
@@ -332,22 +332,27 @@ class FSDBManager(object):
         counter = 0
         iter_max = 1000
         for result in cursor:
-            counter += 1
-            if counter >= iter_max:
-                gevent.sleep(self.SLEEP_INTERVAL)
-                counter = 0
+            if counter == 0:
+                self.db.execute('BEGIN;')
             path = result.path
             full_path = os.path.join(self.base_path, path)
             if not os.path.exists(full_path) or self._is_blacklisted(path):
                 logging.debug('Removing db entry for "%s"' % path)
                 removed_paths.append(path)
             if len(removed_paths) >= batch_size:
-                gevent.sleep(self.SLEEP_INTERVAL)
                 self._remove_paths(removed_paths)
                 removed_paths = []
+                self.db.commit()
+                gevent.sleep(self.SLEEP_INTERVAL)
+            counter += 1
+            if counter >= iter_max:
+                counter = 0
+                self.db.commit()
+                gevent.sleep(self.SLEEP_INTERVAL)
         if len(removed_paths) >= 0:
             gevent.sleep(self.SLEEP_INTERVAL)
             self._remove_paths(removed_paths)
+            self.db.commit()
 
     def _remove_paths(self, paths):
         q = self.db.Delete(self.FS_TABLE, where='path = ?')
