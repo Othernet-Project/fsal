@@ -7,7 +7,7 @@ import time
 import collections
 from itertools import ifilter
 
-import gevent
+import gevent.queue
 import scandir
 
 from .utils import fnwalk, to_unicode, to_bytes
@@ -28,6 +28,28 @@ def sql_escape_path(path):
     for char, escaped_char in SQL_WILDCARDS:
         path = path.replace(char, escaped_char)
     return path
+
+
+def yielding_checked_fnwalk(path, fn, sleep_interval=0.01):
+    parent, name = os.path.split(path)
+    entry = scandir.GenericDirEntry(parent, name)
+    if fn(entry):
+        yield entry
+
+    queue = gevent.queue.Queue()
+    queue.put(path)
+    while True:
+        try:
+            path = queue.get(timeout=0)
+        except gevent.queue.Empty:
+            break
+        else:
+            for entry in scandir.scandir(path):
+                if entry.is_dir():
+                    queue.put(entry.path)
+                if fn(entry):
+                    yield entry
+            gevent.sleep(sleep_interval)
 
 
 def checked_fnwalk(path, fn, shallow=False):
@@ -384,13 +406,9 @@ class FSDBManager(object):
             logging.error('Cannot index "%s". Path does not exist' % src_path)
             return
         id_cache = FIFOCache(1024)
-        batch_size = 1000
-        count = 0
         try:
-            for entry in checked_fnwalk(src_path, checker):
+            for entry in yielding_checked_fnwalk(src_path, checker):
                 path = entry.path
-                if count == 0:
-                    self.db.execute('BEGIN;')
                 rel_path = os.path.relpath(path, self.base_path)
                 parent_path = os.path.dirname(rel_path)
                 parent_id = id_cache[parent_path] if parent_path in id_cache else None
@@ -410,14 +428,7 @@ class FSDBManager(object):
                     logging.debug('Updating db entry for "%s"' % rel_path)
                     if fso.is_dir():
                         id_cache[fso.rel_path] = fso_id
-                count += 1
-                if count == batch_size:
-                    self.db.commit()
-                    gevent.sleep(self.SLEEP_INTERVAL)
-                    count = 0
-            self.db.commit()
         except Exception:
-            self.db.rollback()
             logging.exception('Exception while indexing "%s"' % src_path)
 
 
