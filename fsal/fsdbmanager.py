@@ -13,6 +13,7 @@ import scandir
 from .utils import fnwalk, to_unicode, to_bytes
 from .fs import File, Directory
 from .ondd import ONDDNotificationListener
+from .pmpi import BaseWorker, PoolController
 from .events import FileCreatedEvent, FileDeletedEvent, FileModifiedEvent, \
     DirCreatedEvent, DirModifiedEvent, DirDeletedEvent, FileSystemEventQueue
 
@@ -41,6 +42,40 @@ def checked_fnwalk(path, fn, shallow=False):
             yield entry
     except Exception as e:
         logging.exception('Error during fnwalk: %s' % str(e))
+
+
+class Walker(BaseWorker):
+
+    def solve(self, path):
+        try:
+            entries = scandir.scandir(path)
+        except OSError:
+            return
+        else:
+            check_fn = self.kwargs['fn']
+            for entry in entries:
+                if entry.is_dir():
+                    self.schedule(entry.path)
+                else:
+                    if check_fn(entry):
+                        # make the ``os.stat`` call in the worker process so
+                        # the result will already be cached for the consumer
+                        entry.stat()
+                        self.save_result(entry)
+
+
+def parallel_checked_fnwalk(path, fn, shallow=False):
+    parent, name = os.path.split(path)
+    path = scandir.GenericDirEntry(parent, name)
+    if fn(path):
+        yield path
+
+    pool = PoolController(cls_worker=Walker,
+                          worker_kwargs={'fn': fn},
+                          task_queue_limit=0,
+                          initial_tasks=(path,))
+    for result in pool.start():
+        yield result
 
 
 class FSDBManager(object):
@@ -374,7 +409,7 @@ class FSDBManager(object):
         batch_size = 3000
         count = 0
         try:
-            for entry in checked_fnwalk(src_path, checker):
+            for entry in parallel_checked_fnwalk(src_path, checker):
                 path = entry.path
                 if count == 0:
                     self.db.execute('BEGIN;')
