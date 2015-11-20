@@ -89,7 +89,7 @@ class FSDBManager(object):
 
     PATH_LEN_LIMIT = 32767
 
-    SLEEP_INTERVAL = 0.0001
+    SLEEP_INTERVAL = 0.500
 
     def __init__(self, config, context):
         base_path = os.path.abspath(config['fsal.basepath'])
@@ -364,7 +364,11 @@ class FSDBManager(object):
         self.db.query(q)
         cursor = self.db.drop_cursor()
         removed_paths = []
+        counter = 0
+        iter_max = 1000
         for result in cursor:
+            if counter == 0:
+                self.db.execute('BEGIN;')
             path = result.path
             full_path = os.path.join(self.base_path, path)
             if not os.path.exists(full_path) or self._is_blacklisted(path):
@@ -373,8 +377,17 @@ class FSDBManager(object):
             if len(removed_paths) >= batch_size:
                 self._remove_paths(removed_paths)
                 removed_paths = []
+                self.db.commit()
+                gevent.sleep(self.SLEEP_INTERVAL)
+            counter += 1
+            if counter >= iter_max:
+                counter = 0
+                self.db.commit()
+                gevent.sleep(self.SLEEP_INTERVAL)
         if len(removed_paths) >= 0:
+            gevent.sleep(self.SLEEP_INTERVAL)
             self._remove_paths(removed_paths)
+            self.db.commit()
 
     def _remove_paths(self, paths):
         q = self.db.Delete(self.FS_TABLE, where='path = ?')
@@ -406,7 +419,7 @@ class FSDBManager(object):
             logging.error('Cannot index "%s". Path does not exist' % src_path)
             return
         id_cache = FIFOCache(1024)
-        batch_size = 3000
+        batch_size = 1000
         count = 0
         try:
             for entry in parallel_checked_fnwalk(src_path, checker):
