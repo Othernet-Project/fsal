@@ -179,6 +179,13 @@ class FSAL(object):
     def _parse_confirm_changes_response(self, response_xml):
         return None
 
+    def _parse_generic_response(self, response_xml):
+        success_node = response_xml.find('.//success')
+        success = str_to_bool(success_node.text)
+        error_node = response_xml.find('.//error')
+        error = error_node.text
+        return (success, error)
+
     @command(commandtypes.COMMAND_TYPE_LIST_DIR, _parse_list_dir_response)
     def list_dir(self, path):
         return {'path': path}
@@ -239,3 +246,7 @@ class FSAL(object):
         except Exception:
             file_obj.close()
             raise
+
+    @command(commandtypes.COMMAND_TYPE_REFRESH_PATH, _parse_generic_response)
+    def refresh_path(self, path):
+        return {'path': path}
