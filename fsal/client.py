@@ -246,6 +246,8 @@ class FSAL(object):
         except Exception:
             file_obj.close()
             raise
+        finally:
+            self.refresh_path(fso.rel_path)
 
     @command(commandtypes.COMMAND_TYPE_REFRESH_PATH, _parse_generic_response)
     def refresh_path(self, path):
