@@ -234,5 +234,8 @@ class FSAL(object):
             raise OpenError(fso)
 
         file_obj = open(fso.path, mode)
-        yield file_obj
-        file_obj.close()
+        try:
+            yield file_obj
+        except Exception:
+            file_obj.close()
+            raise
