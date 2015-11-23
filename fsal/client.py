@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+import contextlib
 import functools
 import socket
 
@@ -11,6 +12,7 @@ from .fs import File, Directory
 from .events import event_from_xml
 from .utils import to_unicode
 from .serialize import str_to_bool, bool_to_str, singular_name
+from .exceptions import OpenError
 
 
 IN_ENCODING = 'utf-8'
@@ -225,3 +227,12 @@ class FSAL(object):
     def confirm_changes(self, limit):
         return {'limit': limit}
 
+    @contextlib.contextmanager
+    def open(self, path, mode):
+        (success, fso) = self.get_fso(path)
+        if not success:
+            raise OpenError(fso)
+
+        file_obj = open(fso.path, mode)
+        yield file_obj
+        file_obj.close()
