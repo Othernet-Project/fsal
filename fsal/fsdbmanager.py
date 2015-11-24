@@ -7,10 +7,10 @@ import time
 import collections
 from itertools import ifilter
 
-import gevent
+import gevent.queue
 import scandir
 
-from .utils import fnwalk, to_unicode, to_bytes
+from .utils import to_unicode, to_bytes
 from .fs import File, Directory
 from .ondd import ONDDNotificationListener
 from .events import FileCreatedEvent, FileDeletedEvent, FileModifiedEvent, \
@@ -30,17 +30,29 @@ def sql_escape_path(path):
     return path
 
 
-def checked_fnwalk(path, fn, shallow=False):
+def yielding_checked_fnwalk(path, fn, sleep_interval=0.01):
     try:
         parent, name = os.path.split(path)
-        path = scandir.GenericDirEntry(parent, name)
-        if fn(path):
-            yield path
-
-        for entry in fnwalk(path, fn, shallow):
+        entry = scandir.GenericDirEntry(parent, name)
+        if fn(entry):
             yield entry
+
+        queue = gevent.queue.LifoQueue()
+        queue.put(path)
+        while True:
+            try:
+                path = queue.get(timeout=0)
+            except gevent.queue.Empty:
+                break
+            else:
+                for entry in scandir.scandir(path):
+                    if entry.is_dir():
+                        queue.put(entry.path)
+                    if fn(entry):
+                        yield entry
+                gevent.sleep(sleep_interval)
     except Exception as e:
-        logging.exception('Error during fnwalk: %s' % str(e))
+        logging.exception('Exception while directory walking: {}'.format(str(e)))
 
 
 class FSDBManager(object):
@@ -245,7 +257,7 @@ class FSDBManager(object):
 
     def _remove_from_fs(self, fso):
         events = []
-        for entry in checked_fnwalk(fso.path, lambda: True):
+        for entry in yielding_checked_fnwalk(fso.path, lambda: True):
             path = entry.path
             rel_path = os.path.relpath(path, self.base_path)
             if entry.is_dir():
@@ -303,7 +315,7 @@ class FSDBManager(object):
                 return (False,
                         'Destination path "%s" already exists' % real_dst)
 
-        for entry in checked_fnwalk(abs_src, lambda p: True):
+        for entry in yielding_checked_fnwalk(abs_src, lambda p: True):
             path = entry.path
             path = os.path.relpath(path, abs_src)
             dest_path = os.path.abspath(os.path.join(real_dst, path))
@@ -326,8 +338,6 @@ class FSDBManager(object):
     def _prune_db(self, batch_size=1000):
         q = self.db.Select('path', sets=self.FS_TABLE)
         removed_paths = []
-        counter = 0
-        iter_max = 1000
         for result in self.db.fetchiter(q):
             path = result.path
             full_path = os.path.join(self.base_path, path)
@@ -338,7 +348,6 @@ class FSDBManager(object):
                 self._remove_paths(removed_paths)
                 removed_paths = []
                 self.db.commit()
-            counter += 1
         if len(removed_paths) >= 0:
             self._remove_paths(removed_paths)
 
@@ -372,10 +381,8 @@ class FSDBManager(object):
             logging.error('Cannot index "%s". Path does not exist' % src_path)
             return
         id_cache = FIFOCache(1024)
-        batch_size = 1000
-        count = 0
         try:
-            for entry in checked_fnwalk(src_path, checker):
+            for entry in yielding_checked_fnwalk(src_path, checker):
                 path = entry.path
                 rel_path = os.path.relpath(path, self.base_path)
                 parent_path = os.path.dirname(rel_path)
@@ -396,10 +403,6 @@ class FSDBManager(object):
                     logging.debug('Updating db entry for "%s"' % rel_path)
                     if fso.is_dir():
                         id_cache[fso.rel_path] = fso_id
-                count += 1
-                if count == batch_size:
-                    gevent.sleep(self.SLEEP_INTERVAL)
-                    count = 0
         except Exception:
             logging.exception('Exception while indexing "%s"' % src_path)
 
