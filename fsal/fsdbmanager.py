@@ -95,9 +95,9 @@ class FSDBManager(object):
         if d is None:
             return (False, [])
         else:
-            q = self.db.Select('*', sets=self.FS_TABLE, where='parent_id = ?')
-            cursor = self.db.query(q, d.__id)
-            return (True, self._fso_row_iterator(cursor))
+            q = self.db.Select('*', sets=self.FS_TABLE, where='parent_id = %s')
+            row_iter = self.db.fetchiter(q, (d.__id,))
+            return (True, self._fso_row_iterator(row_iter))
 
     def search(self, query, whole_words=False, exclude=None):
         is_match, files = self.list_dir(query)
@@ -144,9 +144,8 @@ class FSDBManager(object):
         if path == self.ROOT_DIR_PATH:
             return self.get_root_dir()
         else:
-            q = self.db.Select('*', sets=self.FS_TABLE, where='path = ?')
-            self.db.query(q, path)
-            result = self.db.result
+            q = self.db.Select('*', sets=self.FS_TABLE, where='path = %s')
+            result = self.db.fetchone(q, (path,))
             return self._construct_fso(result) if result else None
 
     def remove(self, path):
@@ -326,14 +325,10 @@ class FSDBManager(object):
 
     def _prune_db(self, batch_size=1000):
         q = self.db.Select('path', sets=self.FS_TABLE)
-        self.db.query(q)
-        cursor = self.db.drop_cursor()
         removed_paths = []
         counter = 0
         iter_max = 1000
-        for result in cursor:
-            if counter == 0:
-                self.db.execute('BEGIN;')
+        for result in self.db.fetchiter(q):
             path = result.path
             full_path = os.path.join(self.base_path, path)
             if not os.path.exists(full_path) or self._is_blacklisted(path):
@@ -343,19 +338,12 @@ class FSDBManager(object):
                 self._remove_paths(removed_paths)
                 removed_paths = []
                 self.db.commit()
-                gevent.sleep(self.SLEEP_INTERVAL)
             counter += 1
-            if counter >= iter_max:
-                counter = 0
-                self.db.commit()
-                gevent.sleep(self.SLEEP_INTERVAL)
         if len(removed_paths) >= 0:
-            gevent.sleep(self.SLEEP_INTERVAL)
             self._remove_paths(removed_paths)
-            self.db.commit()
 
     def _remove_paths(self, paths):
-        q = self.db.Delete(self.FS_TABLE, where='path = ?')
+        q = self.db.Delete(self.FS_TABLE, where='path = %s')
         self.db.executemany(q, ((p,) for p in paths))
         events = []
         for p in paths:
@@ -389,8 +377,6 @@ class FSDBManager(object):
         try:
             for entry in checked_fnwalk(src_path, checker):
                 path = entry.path
-                if count == 0:
-                    self.db.execute('BEGIN;')
                 rel_path = os.path.relpath(path, self.base_path)
                 parent_path = os.path.dirname(rel_path)
                 parent_id = id_cache[parent_path] if parent_path in id_cache else None
@@ -412,12 +398,9 @@ class FSDBManager(object):
                         id_cache[fso.rel_path] = fso_id
                 count += 1
                 if count == batch_size:
-                    self.db.commit()
                     gevent.sleep(self.SLEEP_INTERVAL)
                     count = 0
-            self.db.commit()
         except Exception:
-            self.db.rollback()
             logging.exception('Exception while indexing "%s"' % src_path)
 
 
@@ -427,20 +410,28 @@ class FSDBManager(object):
             parent_dir = self._get_dir(parent)
             parent_id = parent_dir.__id if parent_dir else 0
 
-        cols = ['parent_id', 'type', 'name', 'size', 'create_time',
-                'modify_time', 'path']
-        q = self.db.Replace(self.FS_TABLE, cols=cols)
-        size = fso.size if hasattr(fso, 'size') else 0
-        type = self.DIR_TYPE if fso.is_dir() else self.FILE_TYPE
-        values = [parent_id, type, fso.name, size, fso.create_date,
-                  fso.modify_date, fso.rel_path]
+        vals = {
+            'parent_id': parent_id,
+            'type': self.DIR_TYPE if fso.is_dir() else self.FILE_TYPE,
+            'name': fso.name,
+            'size': fso.size,
+            'create_time': fso.create_date,
+            'modify_time': fso.modify_date,
+            'path': fso.rel_path
+        }
+
         if old_entry:
-            cols.append('id')
-            values.append(old_entry.__id)
-        self.db.execute(q, values)
-        q = self.db.Select('last_insert_rowid() as id')
-        self.db.execute(q)
-        return self.db.result.id
+            q = self.db.Update(self.FS_TABLE, 'id = %s')
+            q.set_args = vals
+            self.db.execute(q)
+            return old_entry.__id
+        else:
+            cols = ['parent_id', 'type', 'name', 'size', 'create_time',
+                    'modify_time', 'path']
+            q = self.db.Insert(self.FS_TABLE, cols=cols)
+            raw_query = '{} RETURNING id;'.format(q.serialize()[:-1])
+            result = self.db.fetchone(raw_query, vals)
+            return result[0]
 
     def _clear_db(self):
         with self.db.transaction():

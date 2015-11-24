@@ -34,7 +34,7 @@ from .confloader import ConfDict
 from .handlers import CommandHandlerFactory
 from .responses import CommandResponseFactory
 from .fsdbmanager import FSDBManager
-from .db.databases import get_databases, apply_migrations, close_databases
+from .db.databases import init_databases, close_databases
 
 
 MODDIR = dirname(abspath(__file__))
@@ -183,8 +183,7 @@ def main():
 
     context = dict()
     context['config'] = config
-    context['databases'] = get_databases(config)
-    apply_migrations(config, context)
+    context['databases'] = init_databases(config)
 
     fs_manager = FSDBManager(config, context)
     fs_manager.start()

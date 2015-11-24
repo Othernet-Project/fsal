@@ -103,6 +103,14 @@ def event_from_row(row):
         return cls(row.src)
 
 
+def get_event_dict(event):
+    return {
+        "type": event.event_type,
+        "src": event.src,
+        "is_dir":event.is_dir
+    }
+
+
 class FileSystemEventQueue(object):
 
     EVENTS_TABLE = 'events'
@@ -112,23 +120,23 @@ class FileSystemEventQueue(object):
 
     def add(self, event):
         cols = ['type', 'src', 'is_dir']
-        values = [event.event_type, event.src, event.is_dir]
+        vals = get_event_dict(event)
         q = self.db.Insert(self.EVENTS_TABLE, cols=cols)
-        self.db.execute(q, values)
+        self.db.execute(q, vals)
 
     def additems(self, events):
         cols = ['type', 'src', 'is_dir']
         q = self.db.Insert(self.EVENTS_TABLE, cols=cols)
-        values = ((e.event_type, e.src, e.is_dir) for e in events)
-        self.db.executemany(q, values)
+        vals = (get_event_dict(e) for e in events)
+        self.db.executemany(q, vals)
 
     def getitems(self, maxnum=100):
         items = []
         with self.db.transaction():
             q = self.db.Select(what='*', sets=self.EVENTS_TABLE, limit=maxnum,
                                order='id')
-            cursor = self.db.query(q)
-            for row in cursor:
+            row_iter = self.db.fetchiter(q)
+            for row in row_iter:
                 items.append(event_from_row(row))
         return items
 
@@ -137,9 +145,9 @@ class FileSystemEventQueue(object):
             ids = []
             q = self.db.Select(what='id', sets=self.EVENTS_TABLE, limit=num,
                                order='id')
-            cursor = self.db.query(q)
-            for row in cursor:
+            row_iter = self.db.fetchiter(q)
+            for row in row_iter:
                 ids.append(row.id)
-            q = self.db.Delete(self.EVENTS_TABLE, where='id = ?')
+            q = self.db.Delete(self.EVENTS_TABLE, where='id = %s')
             self.db.executemany(q, ((id,) for id in ids))
             logging.debug('Cleared %d events' % num)
