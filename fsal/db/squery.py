@@ -10,81 +10,42 @@ file that comes with the source code, or http://www.gnu.org/licenses/gpl.txt.
 
 from __future__ import print_function
 
+import inspect
+import functools
 import re
-import sqlite3
-import logging
-from contextlib import contextmanager
 
-import dateutil.parser
+import psycopg2
+
+from psycopg2.extras import NamedTupleCursor
 
 from ..utils import basestring
 from sqlize import (From, Where, Group, Order, Limit, Select, Update, Delete,
                     Insert, Replace, sqlin, sqlarray)
 
+from .pool import PostgresConnectionPool
 
+
+AUTOCOMMIT = psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT
 SLASH = re.compile(r'\\')
+MAX_VARIABLE_NUMBER = 999
+DEFAULT_MAX_POOL_SIZE = 5
 
 
-sqlite3.register_converter('timestamp', dateutil.parser.parse)
+psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
+psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
 
-class Row(sqlite3.Row):
-    """ sqlite.Row subclass that allows attribute access to items """
-    def __getattr__(self, key):
-        return self[key]
-
-    def get(self, key, default=None):
-        key = str(key)
-        try:
-            return self[key]
-        except IndexError:
-            return default
-
-    def __contains__(self, key):
-        return key in self.keys()
-
-
-class Connection(object):
-    """ Wrapper for sqlite3.Connection object """
-    def __init__(self, path=':memory:',):
-        self.path = path
-        self.connect()
-
-    def connect(self):
-        self._conn = sqlite3.connect(self.path,
-                                     detect_types=sqlite3.PARSE_DECLTYPES)
-        self._conn.row_factory = Row
-
-        # Allow manual transaction handling, see http://bit.ly/1C7E7EQ
-        self._conn.isolation_level = None
-        # More on WAL: https://www.sqlite.org/isolation.html
-        # Requires SQLite >= 3.7.0
-        cur = self._conn.cursor()
-        cur.execute('PRAGMA journal_mode=WAL;')
-        logging.debug('Connected to database {}'.format(self.path))
-
-    def close(self):
-        self._conn.commit()
-        self._conn.close()
-
-    def __getattr__(self, attr):
-        return getattr(self._conn, attr)
-
-    def __setattr__(self, attr, value):
-        if not hasattr(self, attr) or attr == '_conn':
-            object.__setattr__(self, attr, value)
-        else:
-            setattr(self._conn, attr, value)
-
-    def __repr__(self):
-        return "<Connection path='%s'>" % self.path
+def call_relevant_args(f, kwargs):
+    valid_args = inspect.getargspec(f).args
+    relevant_args = {k: v for k,v in kwargs.items() if k in valid_args}
+    f(**relevant_args)
 
 
 class Database(object):
 
     # Provide access to query classes for easier access
-    sqlin = sqlin
-    sqlarray = sqlarray
+    sqlin = staticmethod(sqlin)
+    sqlarray = staticmethod(sqlarray)
     From = From
     Where = Where
     Group = Group
@@ -95,140 +56,113 @@ class Database(object):
     Delete = Delete
     Insert = Insert
     Replace = Replace
+    MAX_VARIABLE_NUMBER = MAX_VARIABLE_NUMBER
 
-    def __init__(self, conn, debug=False):
-        self.conn = conn
+    def __init__(self, pool, connection_params, debug=False):
+        self.pool = pool
+        self.connection_params = connection_params
         self.debug = debug
-        self._cursor = None
 
-    def _convert_query(self, qry):
-        """ Ensure any SQLExpression instances are serialized
+    def serialize_query(func):
+        """ Ensure any SQLExpression instances are serialized"""
+        @functools.wraps(func)
+        def wrapper(self, query, *args, **kwargs):
+            if hasattr(query, 'serialize'):
+                query = query.serialize()
 
-        :param qry:     raw SQL string or SQLExpression instance
-        :returns:       raw SQL string
-        """
-        if hasattr(qry, 'serialize'):
-            qry = qry.serialize()
-        assert isinstance(qry, basestring), 'Expected qry to be string'
-        if self.debug:
-            print('SQL:', qry)
-        return qry
+            assert isinstance(query, basestring), 'Expected query to be string'
+            if self.debug:
+                print('SQL:', query)
 
-    def query(self, qry, *params, **kwparams):
-        """ Perform a query
+            return func(self, query, *args, **kwargs)
+        return wrapper
 
-        Any positional arguments are converted to a list of arguments for the
-        query, and are used to populate any '?' placeholders. The keyword
-        arguments are converted to a mapping which provides values to ':name'
-        placeholders. These do not apply to SQLExpression instances.
+    @serialize_query
+    def execute(self, query, *args, **kwargs):
+        return self.pool.execute(query, *args, **kwargs)
 
-        :param qry:     raw SQL or SQLExpression instance
-        :returns:       cursor object
-        """
-        qry = self._convert_query(qry)
-        self.cursor.execute(qry, params or kwparams)
-        return self.cursor
-
-    def execute(self, qry, *args, **kwargs):
-        qry = self._convert_query(qry)
-        self.cursor.execute(qry, *args, **kwargs)
-
-    def executemany(self, qry, *args, **kwargs):
-        qry = self._convert_query(qry)
-        self.cursor.executemany(qry, *args, **kwargs)
+    @serialize_query
+    def executemany(self, query, *args, **kwargs):
+        return self.pool.executemany(query, *args, **kwargs)
 
     def executescript(self, sql):
-        self.cursor.executescript(sql)
+        return self.pool.execute(sql, isolation_level=AUTOCOMMIT)
 
-    def commit(self):
-        self.conn.commit()
+    @serialize_query
+    def fetchone(self, query, *args, **kwargs):
+        return self.pool.fetchone(query, *args, **kwargs)
 
-    def rollback(self):
-        self.conn.rollback()
-        self.conn.commit()
+    @serialize_query
+    def fetchall(self, query, *args, **kwargs):
+        return self.pool.fetchall(query, *args, **kwargs)
 
-    def refresh_table_stats(self):
-        self.execute('ANALYZE sqlite_master;')
+    @serialize_query
+    def fetchiter(self, query, *args, **kwargs):
+        return self.pool.fetchiter(query, *args, **kwargs)
 
-    def acquire_lock(self):
-        self.execute('BEGIN EXCLUSIVE;')
+    def transaction(self, *args, **kwargs):
+        return self.pool.cursor(*args, **kwargs)
 
     def close(self):
-        self.conn.close()
-        # the cached cursor object must be reset, otherwise after reconnecting
-        # it would still try to use it, and would run into the closed db issue
-        self._cursor = None
-
-    def reconnect(self):
-        self.conn.connect()
+        self.pool.closeall()
 
     @property
-    def connection(self):
-        return self.conn
+    def name(self):
+        return self.kwargs.get('dbname')
 
-    @property
-    def cursor(self):
-        if self._cursor is None:
-            self._cursor = self.conn.cursor()
-        return self._cursor
-
-    def drop_cursor(self):
-        cur = self._cursor
-        self._cursor = None
-        return cur
-
-    @property
-    def results(self):
-        return self.cursor.fetchall()
-
-    @property
-    def result(self):
-        return self.cursor.fetchone()
-
-    @contextmanager
-    def transaction(self, silent=False):
-        self.execute('BEGIN;')
-        try:
-            yield self.cursor
-            self.commit()
-        except Exception:
-            self.rollback()
-            if silent:
-                return
-            raise
+    @staticmethod
+    def command(host, port, dbname, user, password, maxsize, sql):
+        pool = PostgresConnectionPool(host=host,
+                                      port=port,
+                                      dbname='postgres',
+                                      user=user,
+                                      password=password,
+                                      maxsize=maxsize)
+        pool.execute(sql, isolation_level=AUTOCOMMIT)
 
     @classmethod
-    def connect(cls, dbpath):
-        return Connection(dbpath)
+    def create(cls, host, port, dbname, user, password, maxsize):
+        sql = 'CREATE DATABASE {};'.format(dbname)
+        cls.command(host, port, dbname, user, password, maxsize, sql)
 
-    def __repr__(self):
-        return "<Database connection='%s'>" % self.conn.path
+    @classmethod
+    def drop(cls, host, port, dbname, user, password, maxsize):
+        sql = 'DROP DATABASE {};'.format(dbname)
+        cls.command(host, port, dbname, user, password, maxsize, sql)
+
+    def recreate(self):
+        self.close()
+        call_relevant_args(self.drop, self.connection_params)
+        call_relevant_args(self.create, self.connection_params)
+        #self.drop(**self.connection_params)
+        #self.create(**self.connection_params)
+
+    @classmethod
+    def connect(cls, host, port, database, user, password,
+                maxsize=DEFAULT_MAX_POOL_SIZE, debug=False):
+        kwargs = dict(host=host,
+                      port=port,
+                      dbname=database,
+                      user=user,
+                      password=password,
+                      maxsize=maxsize,
+                      cursor_factory=NamedTupleCursor)
+        pool = PostgresConnectionPool(**kwargs)
+        try:
+            conn = pool.create_connection()  # testing connection
+        except psycopg2.OperationalError as exc:
+            if 'does not exist' in str(exc):
+                call_relevant_args(cls.create, kwargs)
+            else:
+                raise
+        else:
+            conn.close()  # close this connection as pool manages them later
+
+        return cls(pool, kwargs, debug=debug)
 
 
 class DatabaseContainer(dict):
-    def __init__(self, connections, debug=False):
-        super(DatabaseContainer, self).__init__(
-            {n: Database(c, debug=debug)
-             for n, c in connections.items()})
+
+    def __init__(self, databases):
+        super(DatabaseContainer, self).__init__(databases)
         self.__dict__ = self
-
-
-def get_connection(db_name, db_path):
-    # FIXM: Add unit tests
-    if isinstance(db_path, Database):
-        conn = db_path.conn
-    else:
-        if hasattr(db_path, 'cursor'):
-            conn = db_path
-        else:
-            conn = Database.connect(db_path)
-    return conn
-
-
-def get_connections(db_confs):
-    return {n: get_connection(n, p) for n, p in db_confs.items()}
-
-
-def get_databases(db_confs, debug=False):
-    conns = get_connections(db_confs)
-    return DatabaseContainer(conns, debug=debug)
