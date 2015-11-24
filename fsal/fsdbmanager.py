@@ -122,13 +122,13 @@ class FSDBManager(object):
             q = self.db.Select('*', sets=self.FS_TABLE)
             for _ in like_words:
                 if whole_words:
-                    where_clause = 'name LIKE ?'
+                    where_clause = 'name LIKE %s'
                 else:
-                    where_clause = 'lower(name) LIKE ?'
-                where_clause += ' ESCAPE "%s"' % SQL_ESCAPE_CHAR
+                    where_clause = 'lower(name) LIKE %s'
+                where_clause += ' ESCAPE \'{}\''.format(SQL_ESCAPE_CHAR)
                 q.where |= where_clause
-            self.db.execute(q, like_words)
-            result_gen = self._fso_row_iterator(self.db.cursor)
+            row_iter = self.db.fetchiter(q, like_words)
+            result_gen = self._fso_row_iterator(row_iter)
 
         if exclude and len(exclude) > 0:
             clean_exclude = [f.replace('.', '\.') for f in exclude]
