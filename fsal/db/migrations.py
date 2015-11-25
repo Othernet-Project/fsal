@@ -31,9 +31,9 @@ GET_VERSION_SQL = 'SELECT version FROM {table:s} WHERE id = 0;'.format(
     table=MIGRATION_TABLE
 )
 SET_VERSION_SQL = lambda version: sqlize.Replace(table=MIGRATION_TABLE,
+                                                 constraints=('id',),
                                                  cols=('id', 'version'),
-                                                 vals=('0', str(version)),
-                                                 where='id = 0')
+                                                 vals=('0', str(version)))
 CREATE_MIGRATION_TABLE_SQL = """
 CREATE TABLE {table:s}
 (
@@ -130,14 +130,15 @@ def get_version(db):
     :returns:   current migration version
     """
     try:
-        (version,) = db.fetchone(GET_VERSION_SQL)
+        result = db.fetchone(GET_VERSION_SQL)
     except psycopg2.ProgrammingError as exc:
         if 'does not exist' in str(exc):
             return recreate(db)
         raise
-    except ValueError:
-        return recreate(db)
     else:
+        if result is None:
+            return recreate(db)
+        version = result['version']
         return unpack_version(version)
 
 
