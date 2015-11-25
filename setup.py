@@ -2,12 +2,8 @@
 
 import os
 import sys
-import shutil
 from subprocess import check_output
-from distutils.cmd import Command
 from setuptools import setup, find_packages
-from setuptools.command.develop import develop as DevelopCommand
-from setuptools.command.sdist import sdist as SdistCommand
 
 import fsal
 
@@ -32,35 +28,6 @@ def read(fname):
     f.close()
     return content
 
-
-def clean_pyc():
-    print("cleaning up cached files in '%s'" % SCRIPTDIR)
-    for root, dirs, files in os.walk(SCRIPTDIR):
-        for f in files:
-            if os.path.splitext(f)[1] == '.pyc':
-                path = os.path.join(root, f)
-                print("removing '%s'" % path)
-                os.unlink(path)
-        for d in dirs:
-            if d == '__pycache__':
-                path = os.path.join(root, d)
-                print("removing '%s'" % path)
-                shutil.rmtree(path)
-
-class Develop(DevelopCommand):
-    def run(self):
-        DevelopCommand.run(self)
-
-
-class Package(SdistCommand):
-    def run(self):
-        clean_pyc()
-        SdistCommand.run(self)
-
-
-class Clean(Command):
-    def run(self):
-        clean_pyc()
 
 setup(
     name='fsal',
@@ -96,12 +63,6 @@ setup(
     ],
     dependency_links=[
         'git+ssh://git@github.com/Outernet-Project/librarian-core.git#egg=librarian_core-0.1',
-        'git+ssh://git@github.com/Outernet-Project/librarian-content.git#egg=librarian_content-0.1',
         'git+ssh://git@github.com/Outernet-Project/squery-pg.git#egg=squery_pg-0.1',
     ],
-    cmdclass={
-        'develop': Develop,
-        'sdist': Package,
-        'uncache': Clean,
-    },
 )
