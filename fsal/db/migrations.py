@@ -138,7 +138,7 @@ def get_version(db):
     else:
         if result is None:
             return recreate(db)
-        version = result['version']
+        version = result[0]
         return unpack_version(version)
 
 
