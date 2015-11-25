@@ -111,9 +111,8 @@ class File(FSObject):
 
     @classmethod
     def from_db_row(cls, base_path, row):
-        rel_path = row.path
-        return cls(base_path=base_path, rel_path=rel_path, size=row.size,
-                   create_date=row.create_time, modify_date=row.modify_time)
+        return cls(base_path=base_path, rel_path=row['path'], size=row['size'],
+                   create_date=row['create_time'], modify_date=row['modify_time'])
 
 
 class Directory(FSObject):
@@ -162,9 +161,7 @@ class Directory(FSObject):
                                                                       str(e))
             logging.error(msg)
 
-
     @classmethod
     def from_db_row(cls, base_path, row):
-        rel_path = row.path
-        return cls(base_path=base_path, rel_path=rel_path,
-                   create_date=row.create_time, modify_date=row.modify_time)
+        return cls(base_path=base_path, rel_path=row['path'],
+                   create_date=row['create_time'], modify_date=row['modify_time'])

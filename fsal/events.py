@@ -97,10 +97,10 @@ def event_from_xml(node):
 
 
 def event_from_row(row):
-    key = (row.type, row.is_dir)
+    key = (row['type'], row['is_dir'])
     cls = EVENTS_MAP[key]
     if cls:
-        return cls(row.src)
+        return cls(row['src'])
 
 
 def get_event_dict(event):
@@ -147,7 +147,7 @@ class FileSystemEventQueue(object):
                                order='id')
             row_iter = self.db.fetchiter(q)
             for row in row_iter:
-                ids.append(row.id)
+                ids.append(row['id'])
             q = self.db.Delete(self.EVENTS_TABLE, where='id = %s')
             self.db.executemany(q, ((id,) for id in ids))
             logging.debug('Cleared %d events' % num)

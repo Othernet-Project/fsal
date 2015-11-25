@@ -249,10 +249,10 @@ class FSDBManager(object):
         return any([path.startswith(p) for p in self.blacklist])
 
     def _construct_fso(self, row):
-        type = row.type
+        type = row['type']
         cls = Directory if type == self.DIR_TYPE else File
         fso = cls.from_db_row(self.base_path, row)
-        fso.__id = row.id
+        fso.__id = row['id']
         return fso
 
     def _remove_from_fs(self, fso):
@@ -274,7 +274,7 @@ class FSDBManager(object):
             events = self._remove_from_fs(fso)
             path = sql_escape_path(fso.rel_path)
             q = self.db.Delete(self.FS_TABLE)
-            q.where = 'path LIKE ? ESCAPE "%s"' % SQL_ESCAPE_CHAR
+            q.where = 'path LIKE %s ESCAPE \'{}\''.format(SQL_ESCAPE_CHAR)
             if fso.is_dir():
                 pattern = '%s' + os.sep + '%%'
                 self.db.executemany(q, (((pattern % path),), (path,)))
@@ -339,7 +339,7 @@ class FSDBManager(object):
         q = self.db.Select('path', sets=self.FS_TABLE)
         removed_paths = []
         for result in self.db.fetchiter(q):
-            path = result.path
+            path = result['path']
             full_path = os.path.join(self.base_path, path)
             if not os.path.exists(full_path) or self._is_blacklisted(path):
                 logging.debug('Removing db entry for "%s"' % path)
@@ -347,7 +347,6 @@ class FSDBManager(object):
             if len(removed_paths) >= batch_size:
                 self._remove_paths(removed_paths)
                 removed_paths = []
-                self.db.commit()
         if len(removed_paths) >= 0:
             self._remove_paths(removed_paths)
 
@@ -426,7 +425,7 @@ class FSDBManager(object):
         if old_entry:
             q = self.db.Update(self.FS_TABLE, 'id = %s')
             q.set_args = vals
-            self.db.execute(q)
+            self.db.execute(q, (old_entry.__id,))
             return old_entry.__id
         else:
             cols = ['parent_id', 'type', 'name', 'size', 'create_time',
@@ -434,7 +433,7 @@ class FSDBManager(object):
             q = self.db.Insert(self.FS_TABLE, cols=cols)
             raw_query = '{} RETURNING id;'.format(q.serialize()[:-1])
             result = self.db.fetchone(raw_query, vals)
-            return result[0]
+            return result['id']
 
     def _clear_db(self):
         with self.db.transaction():
