@@ -8,8 +8,8 @@ This software is free software licensed under the terms of GPLv3. See COPYING
 file that comes with the source code, or http://www.gnu.org/licenses/gpl.txt.
 """
 
-from .migrations import migrate
-from squery_pg import Database, DatabaseContainer
+from squery_pg.migrations import migrate
+from squery_pg.squery_pg import Database, DatabaseContainer
 
 
 def get_databases(db_name, host, port, user, password, debug=False):
