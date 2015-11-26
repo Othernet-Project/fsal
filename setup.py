@@ -56,7 +56,6 @@ setup(
         'gevent>=1.0.1',
         'python-dateutil>=2.4.2',
         'scandir>=0.9',
-        'sqlize>=0.1',
         'setuptools',
         'librarian_core',
         'squery_pg',
