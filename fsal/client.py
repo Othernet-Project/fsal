@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+import contextlib
 import functools
 import socket
 
@@ -11,6 +12,7 @@ from .fs import File, Directory
 from .events import event_from_xml
 from .utils import to_unicode
 from .serialize import str_to_bool, bool_to_str, singular_name
+from .exceptions import OpenError
 
 
 IN_ENCODING = 'utf-8'
@@ -177,6 +179,13 @@ class FSAL(object):
     def _parse_confirm_changes_response(self, response_xml):
         return None
 
+    def _parse_generic_response(self, response_xml):
+        success_node = response_xml.find('.//success')
+        success = str_to_bool(success_node.text)
+        error_node = response_xml.find('.//error')
+        error = error_node.text
+        return (success, error)
+
     @command(commandtypes.COMMAND_TYPE_LIST_DIR, _parse_list_dir_response)
     def list_dir(self, path):
         return {'path': path}
@@ -225,3 +234,21 @@ class FSAL(object):
     def confirm_changes(self, limit):
         return {'limit': limit}
 
+    @contextlib.contextmanager
+    def open(self, path, mode):
+        (success, fso) = self.get_fso(path)
+        if not success:
+            raise OpenError(fso)
+
+        file_obj = open(fso.path, mode)
+        try:
+            yield file_obj
+        except Exception:
+            file_obj.close()
+            raise
+        finally:
+            self.refresh_path(fso.rel_path)
+
+    @command(commandtypes.COMMAND_TYPE_REFRESH_PATH, _parse_generic_response)
+    def refresh_path(self, path):
+        return {'path': path}

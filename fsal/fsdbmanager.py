@@ -199,6 +199,13 @@ class FSDBManager(object):
     def confirm_changes(self, limit=100):
         return self.event_queue.delitems(limit)
 
+    def refresh_path(self, path):
+        valid, path = self._validate_path(path)
+        if not valid:
+            return (False, ('No such file or directory "%s"' % path))
+        self._update_db_async(path)
+        return (True, None)
+
     def _handle_notification(self, notification):
         path = notification.path
         logging.debug("Notification received for %s" % path)

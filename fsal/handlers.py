@@ -207,6 +207,16 @@ class ConfirmChangesCommandHandler(CommandHandler):
         return self.send_result(success=True, params={})
 
 
+class RefreshPathCommandHandler(CommandHandler):
+    command_type = commandtypes.COMMAND_TYPE_REFRESH_PATH
+
+    def do_command(self):
+        path = self.command_data.params.path.data
+        success, msg = self.fs_mgr.refresh_path(path)
+        params = {'error': msg}
+        return self.send_result(success=success, params=params)
+
+
 class CommandHandlerFactory(object):
 
     def __init__(self, context):
