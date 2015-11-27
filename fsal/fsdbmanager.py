@@ -46,9 +46,9 @@ def yielding_checked_fnwalk(path, fn, sleep_interval=0.01):
                 break
             else:
                 for entry in scandir.scandir(path):
-                    if entry.is_dir():
-                        queue.put(entry.path)
                     if fn(entry):
+                        if entry.is_dir():
+                            queue.put(entry.path)
                         yield entry
                 gevent.sleep(sleep_interval)
     except Exception as e:
