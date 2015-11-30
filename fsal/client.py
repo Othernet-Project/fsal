@@ -157,10 +157,10 @@ class FSAL(object):
 
             file_node = response_xml.find('.//file')
             return (success, File.from_xml(base_path, file_node))
-
-        error_node = response_xml.find('.//error')
-        error = error_node.text
-        return (success, error)
+        else:
+            error_node = response_xml.find('.//error')
+            error = error_node.text
+            return (success, error)
 
     def _parse_transfer_response(self, response_xml):
         success_node = response_xml.find('.//success')

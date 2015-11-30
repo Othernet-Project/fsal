@@ -159,6 +159,9 @@ class GetFSOResponse(GenericResponse):
                 add_dir_node(params_node, params['dir'])
             else:
                 add_file_node(params_node, params['file'])
+        else:
+            error_node = SubElement(result_node, u'error')
+            error_node.text = to_unicode(self.response_data['params']['error'])
 
         return root
 
