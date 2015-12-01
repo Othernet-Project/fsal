@@ -264,14 +264,18 @@ class FSDBManager(object):
 
     def _remove_from_fs(self, fso):
         events = []
-        for entry in yielding_checked_fnwalk(fso.path, self._fnwalk_checker):
-            path = entry.path
-            rel_path = os.path.relpath(path, self.base_path)
-            if entry.is_dir():
-                event = DirDeletedEvent(rel_path)
-            else:
-                event = FileDeletedEvent(rel_path)
-            events.append(event)
+        if os.path.isdir(fso.path):
+            for entry in yielding_checked_fnwalk(fso.path, self._fnwalk_checker):
+                path = entry.path
+                rel_path = os.path.relpath(path, self.base_path)
+                if entry.is_dir():
+                    event = DirDeletedEvent(rel_path)
+                else:
+                    event = FileDeletedEvent(rel_path)
+                events.append(event)
+        else:
+            events.append(FileDeletedEvent(os.path.relpath(fso.path,
+                                                           self.base_path)))
         remover = shutil.rmtree if fso.is_dir() else os.remove
         remover(fso.path)
         return events
