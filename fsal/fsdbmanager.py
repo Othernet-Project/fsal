@@ -284,11 +284,11 @@ class FSDBManager(object):
             q.where = 'path LIKE %s ESCAPE \'{}\''.format(SQL_ESCAPE_CHAR)
             if fso.is_dir():
                 pattern = '%s' + os.sep + '%%'
-                self.db.executemany(q, (((pattern % path),), (path,)))
+                count = self.db.executemany(q, (((pattern % path),), (path,)))
             else:
-                self.db.execute(q, (path,))
+                count = self.db.execute(q, (path,))
             self.event_queue.additems(events)
-            logging.debug('Removing %d files/dirs' % (self.db.cursor.rowcount))
+            logging.debug('Removing %d files/dirs' % (count))
         except Exception as e:
             msg = 'Exception while removing "%s": %s' % (fso.rel_path, str(e))
             logging.error(msg)
