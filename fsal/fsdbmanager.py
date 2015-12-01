@@ -124,7 +124,7 @@ class FSDBManager(object):
                 if whole_words:
                     where_clause = 'name LIKE %s'
                 else:
-                    where_clause = 'lower(name) LIKE %s'
+                    where_clause = 'name ILIKE %s'
                 where_clause += ' ESCAPE \'{}\''.format(SQL_ESCAPE_CHAR)
                 q.where |= where_clause
             row_iter = self.db.fetchiter(q, like_words)
