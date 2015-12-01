@@ -264,7 +264,7 @@ class FSDBManager(object):
 
     def _remove_from_fs(self, fso):
         events = []
-        for entry in yielding_checked_fnwalk(fso.path, lambda: True):
+        for entry in yielding_checked_fnwalk(fso.path, self._fnwalk_checker):
             path = entry.path
             rel_path = os.path.relpath(path, self.base_path)
             if entry.is_dir():
@@ -373,14 +373,14 @@ class FSDBManager(object):
     def _update_db_async(self, src_path=ROOT_DIR_PATH):
         self.scheduler.schedule(self._update_db, args=(src_path,))
 
-    def _update_db(self, src_path=ROOT_DIR_PATH):
-        def checker(entry):
-            path = entry.path
-            result = (path != self.base_path and not entry.is_symlink())
-            rel_path = os.path.relpath(path, self.base_path)
-            result = result and not self._is_blacklisted(rel_path)
-            return result
+    def _fnwalk_checker(self, entry):
+        path = entry.path
+        result = (path != self.base_path and not entry.is_symlink())
+        rel_path = os.path.relpath(path, self.base_path)
+        result = result and not self._is_blacklisted(rel_path)
+        return result
 
+    def _update_db(self, src_path=ROOT_DIR_PATH):
         src_path = os.path.abspath(os.path.join(self.base_path, src_path))
         src_path = to_unicode(src_path)
         if not os.path.exists(src_path):
@@ -388,7 +388,7 @@ class FSDBManager(object):
             return
         id_cache = FIFOCache(1024)
         try:
-            for entry in yielding_checked_fnwalk(src_path, checker):
+            for entry in yielding_checked_fnwalk(src_path, self._fnwalk_checker):
                 path = entry.path
                 rel_path = os.path.relpath(path, self.base_path)
                 parent_path = os.path.dirname(rel_path)
