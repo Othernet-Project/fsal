@@ -210,15 +210,10 @@ class FSDBManager(object):
         path = notification.path
         logging.debug("Notification received for %s" % path)
         # Find the deepest parent in hierarchy which has been indexed
-        while path != '':
-            if not self.exists(path):
-                path = os.path.dirname(path)
-            else:
-                break
+        path = self._deepest_indexed_parent(path)
         if path == '':
             logging.warn("Cannot index path %s" % notification.path)
             return
-        path = self._deepest_indexed_parent(path)
         self._update_db_async(path)
 
     def _validate_path(self, path):
@@ -245,6 +240,8 @@ class FSDBManager(object):
     def _deepest_indexed_parent(self, path):
         while path != '':
             parent = os.path.dirname(path)
+            if parent == '':
+                parent = self.ROOT_DIR_PATH
             if self.exists(parent):
                 break
             path = parent
