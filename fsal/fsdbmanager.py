@@ -38,7 +38,8 @@ def yielding_checked_fnwalk(path, fn, sleep_interval=0.01):
             yield entry
 
         queue = gevent.queue.LifoQueue()
-        queue.put(path)
+        if entry.is_dir():
+            queue.put(path)
         while True:
             try:
                 path = queue.get(timeout=0)
