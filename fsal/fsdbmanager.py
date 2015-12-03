@@ -434,9 +434,10 @@ class FSDBManager(object):
         }
 
         if old_entry:
-            q = self.db.Update(self.FS_TABLE, 'id = %s')
-            q.set_args = vals
-            self.db.execute(q, (old_entry.__id,))
+            sql_params = { k: '%({})s'.format(k) for k, v in vals.items() }
+            q = self.db.Update(self.FS_TABLE, where='id = %(id)s', **sql_params)
+            vals['id'] = old_entry.__id
+            self.db.execute(q, vals)
             return old_entry.__id
         else:
             cols = ['parent_id', 'type', 'name', 'size', 'create_time',
