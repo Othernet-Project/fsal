@@ -191,8 +191,11 @@ class FSAL(object):
         return {'path': path}
 
     @command(commandtypes.COMMAND_TYPE_EXISTS, _parse_exists_response)
-    def exists(self, path):
-        return {'path': path}
+    def exists(self, path, unindexed=False):
+        return {
+            'path': path,
+            'unindexed': bool_to_str(unindexed)
+        }
 
     @command(commandtypes.COMMAND_TYPE_ISDIR, _parse_isdir_response)
     def isdir(self, path):

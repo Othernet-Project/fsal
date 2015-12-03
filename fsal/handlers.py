@@ -116,10 +116,12 @@ class ExistsCommandHandler(CommandHandler):
 
     def do_command(self):
         path = self.command_data.params.path.data
+        unindexed = str_to_bool(self.command_data.params.unindexed.data)
+
         if path is None:
             exists = False
         else:
-            exists = self.fs_mgr.exists(path)
+            exists = self.fs_mgr.exists(path, unindexed)
         params = {'exists': exists}
         return self.send_result(success=True, params=params)
 

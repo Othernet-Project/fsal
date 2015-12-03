@@ -139,8 +139,17 @@ class FSDBManager(object):
                                  result_gen)
         return (is_match, result_gen)
 
-    def exists(self, path):
-        return (self.get_fso(path) is not None)
+    def exists(self, path, unindexed=False):
+        if unindexed:
+            valid, path = self._validate_path(path)
+            if not valid:
+                return False
+            else:
+                full_path = os.path.abspath(os.path.join(self.base_path,
+                                                         path))
+                return os.path.exists(full_path)
+        else:
+            return (self.get_fso(path) is not None)
 
     def is_dir(self, path):
         fso = self._get_dir(path)
