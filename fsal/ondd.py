@@ -75,14 +75,22 @@ class ONDDNotificationListener(object):
     def _handle_notification(self, notification):
         self.callback(notification)
 
-    def _prepare_socket(self):
-        try:
-            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            sock.connect(self.socket_path)
-            return sock
-        except socket.error as e:
-            logging.error('Unable to connect to ONDD at %s: %s' % (
-                self.socket_path, str(e)))
+    def _prepare_socket(self, retry_interval=5):
+        while True:
+            try:
+                sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                sock.connect(self.socket_path)
+                logging.debug('Connected to ONDD at {}'.format(self.socket_path))
+                return sock
+            except socket.error as e:
+                logging.error('Unable to connect to ONDD at %s: %s. Retrying' % (
+                    self.socket_path, str(e)))
+                if sock:
+                    try:
+                        sock.close()
+                    except:
+                        pass
+                gevent.sleep(retry_interval)
 
     @contextmanager
     def _connect(self):
