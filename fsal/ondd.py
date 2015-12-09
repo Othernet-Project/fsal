@@ -32,31 +32,35 @@ class ONDDNotificationListener(object):
             self._background = None
 
     def _process_stream(self):
-        with self._connect() as sock:
-            if not sock:
-                logging.error('Unable to connect to ONDD for notifications')
-                return
-
-            buff_size = 2048
-            buff = ''
-            try:
-                while True:
-                    data = sock.recv(buff_size)
-                    if data:
-                        buff += data
-                    else:
-                        break
+        while True:
+            with self._connect() as sock:
+                if not sock:
+                    logging.error('Unable to connect to ONDD for notifications')
+                    return
+                sock.settimeout(60) # 1 minute
+                buff_size = 2048
+                buff = ''
+                try:
                     while True:
-                        pos = buff.find('\0')
-                        if pos != -1:
-                            notification_str = buff[:pos].decode(self.IN_ENCODING)
-                            buff = buff[pos+1:]
-                            self._handle_notification_str(notification_str)
+                        data = sock.recv(buff_size)
+                        if data:
+                            buff += data
                         else:
                             break
-            except socket.error as e:
-                msg = 'Error while reading ONDD notification stream %s' % str(e)
-                logging.exception(msg)
+                        while True:
+                            pos = buff.find('\0')
+                            if pos != -1:
+                                notification_str = buff[:pos].decode(self.IN_ENCODING)
+                                buff = buff[pos+1:]
+                                self._handle_notification_str(notification_str)
+                            else:
+                                break
+                except socket.timeout as e:
+                    logging.warn('No data received from ONDD. Reconnecting')
+                    continue
+                except socket.error as e:
+                    msg = 'Error while reading ONDD notification stream %s' % str(e)
+                    logging.exception(msg)
 
     def _handle_notification_str(self, notification_str):
         try:
