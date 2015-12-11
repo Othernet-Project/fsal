@@ -124,9 +124,14 @@ class FSALServer(object):
 
 
 def cleanup(context):
-    context['fs_manager'].stop()
-    context['server'].stop()
-    close_databases(context['databases'])
+    try:
+        context['fs_manager'].stop()
+        context['server'].stop()
+        close_databases(context['databases'])
+    except Exception as e:
+        logging.exception("Exception while shutting down: {}".format(str(e)))
+    finally:
+        logging.info('FSAL shutting down')
 
 
 def configure_logging(config):
@@ -199,6 +204,7 @@ def main():
     gevent.signal(signal.SIGTERM, cleanup_wrapper)
 
     try:
+        logging.info('FSAL server started.')
         server.run()
     except KeyboardInterrupt:
         logging.info('Keyboard interrupt received. Shutting down.')
