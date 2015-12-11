@@ -150,4 +150,5 @@ class FileSystemEventQueue(object):
                 ids.append(row['id'])
             q = self.db.Delete(self.EVENTS_TABLE, where='id = %s')
             self.db.executemany(q, ((id,) for id in ids))
-            logging.debug('Cleared %d events' % len(ids))
+            if len(ids) > 0:
+                logging.debug('Cleared %d events' % len(ids))
