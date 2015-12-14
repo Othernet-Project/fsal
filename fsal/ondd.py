@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
-from gevent import monkey
-monkey.patch_socket()
 
 import socket
+import select
 import logging
 import xml.etree.ElementTree as ET
 
@@ -33,16 +32,21 @@ class ONDDNotificationListener(object):
 
     def _process_stream(self):
         while True:
+            interval = 60 # 1 minute
             with self._connect() as sock:
                 if not sock:
                     logging.error('Unable to connect to ONDD for notifications')
                     return
-                sock.settimeout(60) # 1 minute
+                sock.setblocking(0)
                 buff_size = 2048
                 buff = ''
                 try:
                     while True:
-                        data = sock.recv(buff_size)
+                        ready = select.select([sock], [], [], interval)
+                        if ready[0]:
+                            data = sock.recv(buff_size)
+                        else:
+                            raise socket.timeout('timed out')
                         if data:
                             buff += data
                         else:
