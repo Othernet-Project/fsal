@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import socket
-import select
 import logging
 import xml.etree.ElementTree as ET
 
@@ -31,40 +30,31 @@ class ONDDNotificationListener(object):
             self._background = None
 
     def _process_stream(self):
-        while True:
-            interval = 60 # 1 minute
-            with self._connect() as sock:
-                if not sock:
-                    logging.error('Unable to connect to ONDD for notifications')
-                    return
-                sock.setblocking(0)
-                buff_size = 2048
-                buff = ''
-                try:
+        with self._connect() as sock:
+            if not sock:
+                logging.error('Unable to connect to ONDD for notifications')
+                return
+
+            buff_size = 2048
+            buff = ''
+            try:
+                while True:
+                    data = sock.recv(buff_size)
+                    if data:
+                        buff += data
+                    else:
+                        break
                     while True:
-                        ready = select.select([sock], [], [], interval)
-                        if ready[0]:
-                            data = sock.recv(buff_size)
-                        else:
-                            raise socket.timeout('timed out')
-                        if data:
-                            buff += data
+                        pos = buff.find('\0')
+                        if pos != -1:
+                            notification_str = buff[:pos].decode(self.IN_ENCODING)
+                            buff = buff[pos+1:]
+                            self._handle_notification_str(notification_str)
                         else:
                             break
-                        while True:
-                            pos = buff.find('\0')
-                            if pos != -1:
-                                notification_str = buff[:pos].decode(self.IN_ENCODING)
-                                buff = buff[pos+1:]
-                                self._handle_notification_str(notification_str)
-                            else:
-                                break
-                except socket.timeout as e:
-                    logging.warn('No data received from ONDD. Reconnecting')
-                    continue
-                except socket.error as e:
-                    msg = 'Error while reading ONDD notification stream %s' % str(e)
-                    logging.exception(msg)
+            except socket.error as e:
+                msg = 'Error while reading ONDD notification stream %s' % str(e)
+                logging.exception(msg)
 
     def _handle_notification_str(self, notification_str):
         try:
