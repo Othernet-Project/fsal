@@ -84,7 +84,7 @@ class FSDBManager(object):
                 sanitized_blacklist.append(p)
         self.blacklist = sanitized_blacklist
 
-        self.notification_listener = ONDDNotificationListener(config, self._handle_notification)
+        self.notification_listener = ONDDNotificationListener(config, self._handle_notifications)
         self.event_queue = FileSystemEventQueue(config, context)
         self.scheduler = TaskScheduler(0.2)
 
@@ -216,15 +216,19 @@ class FSDBManager(object):
         self._update_db_async(path)
         return (True, None)
 
-    def _handle_notification(self, notification):
-        path = notification.path
-        logging.debug("Notification received for %s" % path)
-        # Find the deepest parent in hierarchy which has been indexed
-        path = self._deepest_indexed_parent(path)
-        if path == '':
-            logging.warn("Cannot index path %s" % notification.path)
-            return
-        self._update_db_async(path)
+    def _handle_notifications(self, notifications):
+        for notification in notifications:
+            try:
+                path = notification.path
+                logging.debug("Notification received for %s" % path)
+                # Find the deepest parent in hierarchy which has been indexed
+                path = self._deepest_indexed_parent(path)
+                if path == '':
+                    logging.warn("Cannot index path %s" % notification.path)
+                    return
+                self._update_db_async(path)
+            except:
+                logging.exception('Unexpected error in handling notification')
 
     def _validate_path(self, path):
         if path is None or len(path.strip()) == 0:
