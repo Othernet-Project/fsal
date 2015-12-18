@@ -63,6 +63,8 @@ class ONDDNotificationListener(object):
         file_complete_events = ifilter(filter_file_complete, events_xml)
         notifications = [self.event_factory.create_event(e)
                          for e in file_complete_events]
+        logging.debug('Fetched {} events from ONDD'.format(len(notifications)))
+
         if notifications:
             self._handle_notifications(notifications)
 
