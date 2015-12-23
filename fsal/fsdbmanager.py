@@ -219,7 +219,7 @@ class FSDBManager(object):
     def _handle_notifications(self, notifications):
         for notification in notifications:
             try:
-                path = notification.path
+                path = notification['path']
                 logging.debug("Notification received for %s" % path)
                 # Find the deepest parent in hierarchy which has been indexed
                 path = self._deepest_indexed_parent(path)
