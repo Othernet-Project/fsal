@@ -10,9 +10,10 @@ from itertools import ifilter
 import gevent.queue
 import scandir
 
-from .utils import to_unicode, to_bytes
+from .utils import to_unicode, to_bytes, common_ancestor
 from .fs import File, Directory
 from .ondd import ONDDNotificationListener
+from .bundles import BundleExtracter
 from .events import FileCreatedEvent, FileDeletedEvent, FileModifiedEvent, \
     DirCreatedEvent, DirModifiedEvent, DirDeletedEvent, FileSystemEventQueue
 
@@ -82,6 +83,8 @@ class FSDBManager(object):
             valid, p = self._validate_path(p)
             if valid:
                 sanitized_blacklist.append(p)
+        self.bundle_ext = BundleExtracter(config, base_path)
+        sanitized_blacklist.append(self.bundle_ext.bundles_dir)
         self.blacklist = sanitized_blacklist
 
         self.notification_listener = ONDDNotificationListener(config, self._handle_notifications)
@@ -221,6 +224,8 @@ class FSDBManager(object):
             try:
                 path = notification['path']
                 logging.debug("Notification received for %s" % path)
+                if self.is_bundle(path):
+                    path = self._handle_bundle(path)
                 # Find the deepest parent in hierarchy which has been indexed
                 path = self._deepest_indexed_parent(path)
                 if path == '':
@@ -229,6 +234,19 @@ class FSDBManager(object):
                 self._update_db_async(path)
             except:
                 logging.exception('Unexpected error in handling notification')
+
+    def is_bundle(self, path):
+        return self.bundle_ext.is_bundle(path)
+
+    def _handle_bundle(self, path):
+        success, paths = self.bundle_ext.extract_bundle(path)
+        if success:
+            try:
+                abspath = self.bundle_ext.abspath(path)
+                os.remove(abspath)
+            except OSError as e:
+                logging.exception('Exception while removing bundle after extraction: {}'.format(str(e)))
+            return common_ancestor(paths)
 
     def _validate_path(self, path):
         if path is None or len(path.strip()) == 0:
