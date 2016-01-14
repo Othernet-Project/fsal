@@ -224,8 +224,12 @@ class FSDBManager(object):
             try:
                 path = notification['path']
                 logging.debug("Notification received for %s" % path)
-                if self.is_bundle(path):
-                    path = self._handle_bundle(path)
+                if self._is_bundle(path):
+                    extracted_path = self._handle_bundle(path)
+                    if not extracted_path:
+                        logging.warn('Could not process bundle {}. Skipping...'.format(path))
+                        continue
+                    path = extracted_path
                 # Find the deepest parent in hierarchy which has been indexed
                 path = self._deepest_indexed_parent(path)
                 if path == '':
@@ -235,7 +239,7 @@ class FSDBManager(object):
             except:
                 logging.exception('Unexpected error in handling notification')
 
-    def is_bundle(self, path):
+    def _is_bundle(self, path):
         return self.bundle_ext.is_bundle(path)
 
     def _handle_bundle(self, path):
@@ -247,6 +251,7 @@ class FSDBManager(object):
             except OSError as e:
                 logging.exception('Exception while removing bundle after extraction: {}'.format(str(e)))
             return common_ancestor(paths)
+        return None
 
     def _validate_path(self, path):
         if path is None or len(path.strip()) == 0:
