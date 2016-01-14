@@ -9,10 +9,11 @@ def extract_zip_bundle(bundle_path, extract_path):
     try:
         zfile = zippie.PieZipFile(bundle_path)
         files = zfile.namelist()
+        # TODO: Add check for testing integrity of zip bundle
         zfile.extractall(extract_path)
         success = True
-    except RuntimeError as e:
-        logging.exception('Error while extracting zip bundle {}'.format(str(e)))
+    except (RuntimeError, zippie.BadZipFile) as e:
+        logging.exception('Error while extracting zip bundle: {}'.format(str(e)))
     return success, files
 
 
