@@ -1,6 +1,9 @@
 import os
 import logging
+
 import zippie
+
+from .utils import common_ancestor
 
 
 def extract_zip_bundle(bundle_path, extract_path):
@@ -30,7 +33,7 @@ class BundleExtracter(object):
         abspath = self.abspath(path)
         if os.path.isfile(abspath):
             ext = os.path.splitext(path)[1][1:]
-            return path.startswith(self.bundles_dir) and ext in self.bundles_exts
+            return common_ancestor(path, self.bundles_dir) != '' and ext in self.bundles_exts
         return False
 
     def extract_bundle(self, bundle_path):

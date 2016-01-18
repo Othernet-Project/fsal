@@ -251,7 +251,7 @@ class FSDBManager(object):
                 os.remove(abspath)
             except OSError as e:
                 logging.exception('Exception while removing bundle after extraction: {}'.format(str(e)))
-            return common_ancestor(paths)
+            return common_ancestor(*paths)
         return None
 
     def _validate_path(self, path):
@@ -288,7 +288,7 @@ class FSDBManager(object):
         return path
 
     def _is_blacklisted(self, path):
-        return any([path.startswith(p) for p in self.blacklist])
+        return any((common_ancestor(p, path) != '' for p in self.blacklist))
 
     def _construct_fso(self, row):
         type = row['type']
