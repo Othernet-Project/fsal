@@ -57,11 +57,13 @@ setup(
         'python-dateutil>=2.4.2',
         'scandir>=0.9',
         'setuptools',
+        'zippie',
         'librarian_core',
         'squery_pg',
     ],
     dependency_links=[
         'git+ssh://git@github.com/Outernet-Project/librarian-core.git#egg=librarian_core-0.1',
         'git+ssh://git@github.com/Outernet-Project/squery-pg.git#egg=squery_pg-0.1',
+        'git+ssh://git@github.com/integricho/zippie.git#egg=zippie-0.0.1',
     ],
 )

@@ -61,6 +61,20 @@ def fnwalk(path, fn, shallow=False):
                 yield entry
 
 
+def common_ancestor(*paths):
+    path_components = [p.split(os.path.sep) for p in paths]
+    min_path_length = min(len(p) for p in path_components)
+
+    common_path = []
+    for i in range(min_path_length):
+        common_component = set(p[i] for p in path_components)
+        if len(common_component) != 1:
+            break
+        common_path.append(common_component.pop())
+
+    return os.path.sep.join(common_path)
+
+
 def validate_path(base_path, path):
     path = path.lstrip(os.sep)
     full_path = os.path.abspath(os.path.join(base_path, path))

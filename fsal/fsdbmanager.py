@@ -10,9 +10,10 @@ from itertools import ifilter
 import gevent.queue
 import scandir
 
-from .utils import to_unicode, to_bytes
+from .utils import to_unicode, to_bytes, common_ancestor
 from .fs import File, Directory
 from .ondd import ONDDNotificationListener
+from .bundles import BundleExtracter
 from .events import FileCreatedEvent, FileDeletedEvent, FileModifiedEvent, \
     DirCreatedEvent, DirModifiedEvent, DirDeletedEvent, FileSystemEventQueue
 
@@ -76,12 +77,15 @@ class FSDBManager(object):
 
         self.base_path = base_path
         self.db = context['databases'].fs
+        self.bundles_dir = config['bundles.bundles_dir']
         blacklist = config['fsal.blacklist']
         sanitized_blacklist = []
         for p in blacklist:
             valid, p = self._validate_path(p)
             if valid:
                 sanitized_blacklist.append(p)
+        self.bundle_ext = BundleExtracter(config, base_path)
+        sanitized_blacklist.append(self.bundle_ext.bundles_dir)
         self.blacklist = sanitized_blacklist
 
         self.notification_listener = ONDDNotificationListener(config, self._handle_notifications)
@@ -221,6 +225,12 @@ class FSDBManager(object):
             try:
                 path = notification['path']
                 logging.debug("Notification received for %s" % path)
+                if self._is_bundle(path):
+                    extracted_path = self._handle_bundle(path)
+                    if not extracted_path:
+                        logging.warn('Could not process bundle {}. Skipping...'.format(path))
+                        continue
+                    path = extracted_path
                 # Find the deepest parent in hierarchy which has been indexed
                 path = self._deepest_indexed_parent(path)
                 if path == '':
@@ -229,6 +239,20 @@ class FSDBManager(object):
                 self._update_db_async(path)
             except:
                 logging.exception('Unexpected error in handling notification')
+
+    def _is_bundle(self, path):
+        return self.bundle_ext.is_bundle(path)
+
+    def _handle_bundle(self, path):
+        success, paths = self.bundle_ext.extract_bundle(path)
+        if success:
+            try:
+                abspath = self.bundle_ext.abspath(path)
+                os.remove(abspath)
+            except OSError as e:
+                logging.exception('Exception while removing bundle after extraction: {}'.format(str(e)))
+            return common_ancestor(*paths)
+        return None
 
     def _validate_path(self, path):
         if path is None or len(path.strip()) == 0:
@@ -264,7 +288,7 @@ class FSDBManager(object):
         return path
 
     def _is_blacklisted(self, path):
-        return any([path.startswith(p) for p in self.blacklist])
+        return any((common_ancestor(p, path) != '' for p in self.blacklist))
 
     def _construct_fso(self, row):
         type = row['type']
@@ -353,6 +377,7 @@ class FSDBManager(object):
     def _refresh_db(self):
         start = time.time()
         self._prune_db()
+        self._extract_bundles()
         self._update_db()
         end = time.time()
         logging.debug('DB refreshed in %0.3f ms' % ((end - start) * 1000))
@@ -427,6 +452,21 @@ class FSDBManager(object):
         except Exception:
             logging.exception('Exception while indexing "%s"' % src_path)
 
+    def _extract_bundles(self):
+        def bundle_checker(entry):
+            path = os.path.relpath(entry.path, self.base_path)
+            return self._is_bundle(path)
+        try:
+            path = os.path.abspath(os.path.join(self.base_path, self.bundles_dir))
+            for entry in yielding_checked_fnwalk(path, bundle_checker):
+                try:
+                    path = os.path.relpath(entry.path, self.base_path)
+                    logging.debug('Extracting bundle {}'.format(path))
+                    self._handle_bundle(path)
+                except Exception as e:
+                    logging.exception('Unexpected exception while extracing bundle {}: {}'.format(path, str(e)))
+        except Exception as e:
+            logging.exception('Unexpected exception while extracing bundles {}'.format(str(e)))
 
     def _update_fso_entry(self, fso, parent_id=None, old_entry=None):
         if not parent_id:
