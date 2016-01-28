@@ -6,12 +6,22 @@ import zippie
 from .utils import common_ancestor
 
 
+def verify_paths(paths, extract_path):
+    for path in paths:
+        abspath = os.path.abspath(os.path.join(extract_path, path))
+        if not abspath.startswith(extract_path):
+            return False
+    else:
+        return True
+
 def extract_zip_bundle(bundle_path, extract_path):
     success = False
     files = []
     try:
         zfile = zippie.PieZipFile(bundle_path)
         files = zfile.namelist()
+        if not verify_paths(files, extract_path):
+            raise RuntimeError('Invalid paths used in bundle: {}'.format(str(files)))
         # TODO: Add check for testing integrity of zip bundle
         zfile.extractall(extract_path)
         success = True
