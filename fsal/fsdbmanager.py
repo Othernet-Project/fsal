@@ -14,7 +14,7 @@ import scandir
 from .utils import to_unicode, to_bytes, common_ancestor
 from .fs import File, Directory
 from .ondd import ONDDNotificationListener
-from .bundles import BundleExtracter
+from .bundles import BundleExtracter, abs_bundle_path
 from .events import FileCreatedEvent, FileDeletedEvent, FileModifiedEvent, \
     DirCreatedEvent, DirModifiedEvent, DirDeletedEvent, FileSystemEventQueue
 
@@ -242,8 +242,9 @@ class FSDBManager(object):
             try:
                 path = notification['path']
                 logging.debug("Notification received for %s" % path)
-                if self._is_bundle(path):
-                    extracted_path = self._handle_bundle(path)
+                is_bundle, base_path = self._is_bundle(path)
+                if is_bundle:
+                    extracted_path = self._handle_bundle(base_path, path)
                     if not extracted_path:
                         logging.warn(
                             'Could not process bundle {}. Skipping...'.format(path))
@@ -258,14 +259,18 @@ class FSDBManager(object):
             except:
                 logging.exception('Unexpected error in handling notification')
 
-    def _is_bundle(self, base_path, path):
-        return self.bundle_ext.is_bundle(base_path, path)
+    def _is_bundle(self, path):
+        for base_path in self.base_paths:
+            if self.bundle_ext.is_bundle(base_path, path):
+                return (True, base_path)
+        else:
+            return (False, None)
 
-    def _handle_bundle(self, path):
-        success, paths = self.bundle_ext.extract_bundle(path)
+    def _handle_bundle(self, base_path, path):
+        success, paths = self.bundle_ext.extract_bundle(path, base_path)
         if success:
             try:
-                abspath = self.bundle_ext.abspath(path)
+                abspath = abs_bundle_path(base_path, path)
                 os.remove(abspath)
             except OSError as e:
                 logging.exception(
@@ -486,7 +491,8 @@ class FSDBManager(object):
     def _extract_bundles(self):
         def bundle_checker(base_path, entry):
             path = os.path.relpath(entry.path, base_path)
-            return self._is_bundle(base_path, path)
+            is_bundle, _ = self._is_bundle(path)
+            return is_bundle
 
         for base_path in self.base_paths:
             try:
@@ -497,7 +503,7 @@ class FSDBManager(object):
                     try:
                         path = os.path.relpath(entry.path, base_path)
                         logging.debug('Extracting bundle {}'.format(path))
-                        self._handle_bundle(path)
+                        self._handle_bundle(base_path, path)
                     except Exception as e:
                         logging.exception(
                             'Unexpected exception while extracing bundle {}: {}'.format(path, str(e)))
