@@ -55,7 +55,8 @@ def yielding_checked_fnwalk(path, fn, sleep_interval=0.01):
                         yield entry
                 gevent.sleep(sleep_interval)
     except Exception as e:
-        logging.exception('Exception while directory walking: {}'.format(str(e)))
+        logging.exception(
+            'Exception while directory walking: {}'.format(str(e)))
 
 
 class FSDBManager(object):
@@ -75,7 +76,8 @@ class FSDBManager(object):
         paths = config['fsal.basepaths']
         base_paths = map(os.path.abspath, filter(os.path.isdir, paths))
         if not base_paths:
-            msg = 'No valid path found in basepaths: {}'.format(', '.join(paths))
+            msg = 'No valid path found in basepaths: {}'.format(
+                ', '.join(paths))
             raise RuntimeError(msg)
 
         self.base_paths = base_paths
@@ -92,7 +94,8 @@ class FSDBManager(object):
         sanitized_blacklist.append(self.bundle_ext.bundles_dir)
         self.blacklist = sanitized_blacklist
 
-        self.notification_listener = ONDDNotificationListener(config, self._handle_notifications)
+        self.notification_listener = ONDDNotificationListener(
+            config, self._handle_notifications)
         self.event_queue = FileSystemEventQueue(config, context)
         self.scheduler = TaskScheduler(0.2)
 
@@ -156,7 +159,7 @@ class FSDBManager(object):
             else:
                 for base_path in self.base_paths:
                     full_path = os.path.abspath(os.path.join(base_path,
-                                                            path))
+                                                             path))
                     if os.path.exists(full_path):
                         return True
                 else:
@@ -211,7 +214,6 @@ class FSDBManager(object):
             success = False
             msg = str(e)
 
-        #TODO: Fix below
         # Find the deepest parent in hierarchy which has been indexed
         path = os.path.relpath(real_dst, base_path)
         path = self._deepest_indexed_parent(path)
@@ -224,7 +226,6 @@ class FSDBManager(object):
 
     def confirm_changes(self, limit=100):
         return self.event_queue.delitems(limit)
-
 
     def refresh(self):
         self._refresh_db_async()
@@ -244,7 +245,8 @@ class FSDBManager(object):
                 if self._is_bundle(path):
                     extracted_path = self._handle_bundle(path)
                     if not extracted_path:
-                        logging.warn('Could not process bundle {}. Skipping...'.format(path))
+                        logging.warn(
+                            'Could not process bundle {}. Skipping...'.format(path))
                         continue
                     path = extracted_path
                 # Find the deepest parent in hierarchy which has been indexed
@@ -266,7 +268,8 @@ class FSDBManager(object):
                 abspath = self.bundle_ext.abspath(path)
                 os.remove(abspath)
             except OSError as e:
-                logging.exception('Exception while removing bundle after extraction: {}'.format(str(e)))
+                logging.exception(
+                    'Exception while removing bundle after extraction: {}'.format(str(e)))
             return common_ancestor(*paths)
         return None
 
@@ -277,7 +280,8 @@ class FSDBManager(object):
             path = path.strip()
             path = path.lstrip(os.sep)
             path = path.rstrip(os.sep)
-            # This checks for paths which escape the base path, so test against any path is valid
+            # This checks for paths which escape the base path, so test against
+            # any path is valid
             base_path = self.base_paths[0]
             full_path = os.path.abspath(os.path.join(base_path, path))
             valid = full_path.startswith(base_path)
@@ -460,7 +464,8 @@ class FSDBManager(object):
                 parent_path = os.path.dirname(rel_path)
                 parent_id = id_cache[parent_path] if parent_path in id_cache else None
                 if entry.is_dir():
-                    fso = Directory.from_stat(base_path, rel_path, entry.stat())
+                    fso = Directory.from_stat(
+                        base_path, rel_path, entry.stat())
                 else:
                     fso = File.from_stat(base_path, rel_path, entry.stat())
                 old_fso = self.get_fso(rel_path)
@@ -485,7 +490,8 @@ class FSDBManager(object):
 
         for base_path in self.base_paths:
             try:
-                path = os.path.abspath(os.path.join(base_path, self.bundles_dir))
+                path = os.path.abspath(
+                    os.path.join(base_path, self.bundles_dir))
                 checker = functools.partial(bundle_checker, base_path)
                 for entry in yielding_checked_fnwalk(path, checker):
                     try:
@@ -493,9 +499,11 @@ class FSDBManager(object):
                         logging.debug('Extracting bundle {}'.format(path))
                         self._handle_bundle(path)
                     except Exception as e:
-                        logging.exception('Unexpected exception while extracing bundle {}: {}'.format(path, str(e)))
+                        logging.exception(
+                            'Unexpected exception while extracing bundle {}: {}'.format(path, str(e)))
             except Exception as e:
-                logging.exception('Unexpected exception while extracing bundles in {}: {}'.format(base_path, str(e)))
+                logging.exception(
+                    'Unexpected exception while extracing bundles in {}: {}'.format(base_path, str(e)))
 
     def _update_fso_entry(self, fso, parent_id=None, old_entry=None):
         if not parent_id:
@@ -515,8 +523,9 @@ class FSDBManager(object):
         }
 
         if old_entry:
-            sql_params = { k: '%({})s'.format(k) for k, v in vals.items() }
-            q = self.db.Update(self.FS_TABLE, where='id = %(id)s', **sql_params)
+            sql_params = {k: '%({})s'.format(k) for k, v in vals.items()}
+            q = self.db.Update(
+                self.FS_TABLE, where='id = %(id)s', **sql_params)
             vals['id'] = old_entry.__id
             self.db.execute(q, vals)
             return old_entry.__id
