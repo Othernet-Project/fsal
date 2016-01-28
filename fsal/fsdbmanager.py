@@ -225,6 +225,10 @@ class FSDBManager(object):
     def confirm_changes(self, limit=100):
         return self.event_queue.delitems(limit)
 
+
+    def refresh(self):
+        self._refresh_db_async()
+
     def refresh_path(self, path):
         valid, path = self._validate_path(path)
         if not valid:

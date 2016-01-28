@@ -217,6 +217,14 @@ class RefreshPathCommandHandler(CommandHandler):
         return self.send_result(success=success, params=params)
 
 
+class RefreshCommandHandler(CommandHandler):
+    command_type = commandtypes.COMMAND_TYPE_REFRESH
+
+    def do_command(self):
+        self.fs_mgr.refresh()
+        return self.send_result(success=True, params={})
+
+
 class CommandHandlerFactory(object):
 
     def __init__(self, context):

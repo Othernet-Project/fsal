@@ -174,6 +174,9 @@ class FSAL(object):
     def _parse_confirm_changes_response(self, response_xml):
         return None
 
+    def _parse_empty_response(self, response_xml):
+        return None
+
     def _parse_generic_response(self, response_xml):
         success_node = response_xml.find('.//success')
         success = str_to_bool(success_node.text)
@@ -250,3 +253,7 @@ class FSAL(object):
     @command(commandtypes.COMMAND_TYPE_REFRESH_PATH, _parse_generic_response)
     def refresh_path(self, path):
         return {'path': path}
+
+    @command(commandtypes.COMMAND_TYPE_REFRESH, _parse_empty_response)
+    def refresh(self):
+        return {}
