@@ -409,7 +409,7 @@ class FSDBManager(object):
             path = result['path']
             base_path = result['base_path'] or ''
             full_path = os.path.join(base_path, path)
-            if not os.path.exists(full_path) or self._is_blacklisted(path):
+            if base_path not in self.base_paths or not os.path.exists(full_path) or self._is_blacklisted(path):
                 logging.debug('Removing db entry for "%s"' % path)
                 removed_paths.append((base_path, path))
             if len(removed_paths) >= batch_size:
