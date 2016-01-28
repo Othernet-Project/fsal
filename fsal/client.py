@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 
 import contextlib
 import functools
@@ -101,13 +100,10 @@ class FSAL(object):
         dirs = []
         files = []
         if success:
-            base_path = response_xml.find('.//base-path').text
             dirs_node = response_xml.find('.//dirs')
             files_node = response_xml.find('.//files')
-            dir_gen = functools.partial(Directory.from_xml, base_path)
-            file_gen = functools.partial(File.from_xml, base_path)
-            dirs = list(iter_fsobjs(dirs_node, dir_gen))
-            files = list(iter_fsobjs(files_node, file_gen))
+            dirs = list(iter_fsobjs(dirs_node, Directory.from_xml))
+            files = list(iter_fsobjs(files_node, File.from_xml))
             sort_listing(dirs)
             sort_listing(files)
         return (success, dirs, files)
@@ -150,13 +146,12 @@ class FSAL(object):
         success_node = response_xml.find('.//success')
         success = str_to_bool(success_node.text)
         if success:
-            base_path = response_xml.find('.//base-path').text
             dir_node = response_xml.find('.//dir')
             if dir_node is not None:
-                return (success, Directory.from_xml(base_path, dir_node))
+                return (success, Directory.from_xml(dir_node))
 
             file_node = response_xml.find('.//file')
-            return (success, File.from_xml(base_path, file_node))
+            return (success, File.from_xml(file_node))
         else:
             error_node = response_xml.find('.//error')
             error = error_node.text
