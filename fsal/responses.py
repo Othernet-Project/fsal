@@ -56,6 +56,8 @@ class GenericResponse:
 
 def add_dir_node(parent_node, fso):
     dir_node = SubElement(parent_node, u'dir')
+    base_path_node = SubElement(dir_node, u'base-path')
+    base_path_node.text = to_unicode(fso.base_path)
     rel_path_node = SubElement(dir_node, u'rel-path')
     rel_path_node.text = to_unicode(fso.rel_path)
     create_timestamp_node = SubElement(dir_node, u'create-timestamp')
@@ -66,6 +68,8 @@ def add_dir_node(parent_node, fso):
 
 def add_file_node(parent_node, fso):
     file_node = SubElement(parent_node, u'file')
+    base_path_node = SubElement(file_node, u'base-path')
+    base_path_node.text = to_unicode(fso.base_path)
     rel_path_node = SubElement(file_node, u'rel-path')
     rel_path_node.text = to_unicode(fso.rel_path)
     size_node = SubElement(file_node, u'size')
@@ -97,10 +101,6 @@ class DirectoryListingResponse(GenericResponse):
         if success:
             params_node = SubElement(result_node, u'params')
 
-            base_path = self.response_data['params']['base_path']
-            base_path_node = SubElement(params_node, u'base-path')
-            base_path_node.text = to_unicode(base_path)
-
             dirs_node = SubElement(params_node, u'dirs')
             for d in self.response_data['params']['dirs']:
                 add_dir_node(dirs_node, d)
@@ -122,10 +122,6 @@ class SearchResponse(GenericResponse):
         success_node.text = to_unicode(success).lower()
         if success:
             params_node = SubElement(result_node, u'params')
-
-            base_path = self.response_data['params']['base_path']
-            base_path_node = SubElement(params_node, u'base-path')
-            base_path_node.text = to_unicode(base_path)
 
             is_match = to_unicode(self.response_data['params']['is_match'])
             is_match_node = SubElement(params_node, u'is-match')
@@ -153,8 +149,6 @@ class GetFSOResponse(GenericResponse):
         if success:
             params = self.response_data['params']
             params_node = SubElement(result_node, u'params')
-            base_path_node = SubElement(params_node, u'base-path')
-            base_path_node.text = to_unicode(params['base_path'])
             if 'dir' in params:
                 add_dir_node(params_node, params['dir'])
             else:

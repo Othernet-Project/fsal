@@ -8,6 +8,7 @@ class FSObject(object):
 
     def __init__(self, base_path, rel_path, create_date, modify_date):
         self._rel_path = rel_path
+        self._base_path = base_path
         self._path = os.path.join(base_path, rel_path)
         self._name = os.path.split(rel_path)[1]
         self._create_date = create_date
@@ -20,6 +21,10 @@ class FSObject(object):
     @property
     def rel_path(self):
         return self._rel_path
+
+    @property
+    def base_path(self):
+        return self._base_path
 
     @property
     def name(self):
@@ -80,7 +85,8 @@ class File(FSObject):
         return not result
 
     @classmethod
-    def from_xml(cls, base_path, file_xml):
+    def from_xml(cls, file_xml):
+        base_path = file_xml.find('base-path').text
         rel_path = file_xml.find('rel-path').text
         size = file_xml.find('size').text
         create_timestamp = file_xml.find('create-timestamp').text
@@ -110,8 +116,8 @@ class File(FSObject):
                     create_date=create_date, modify_date=modify_date)
 
     @classmethod
-    def from_db_row(cls, base_path, row):
-        return cls(base_path=base_path, rel_path=row['path'], size=row['size'],
+    def from_db_row(cls, row):
+        return cls(base_path=row['base_path'], rel_path=row['path'], size=row['size'],
                    create_date=row['create_time'], modify_date=row['modify_time'])
 
 
@@ -129,7 +135,8 @@ class Directory(FSObject):
         return 0  # TODO: implement me
 
     @classmethod
-    def from_xml(cls, base_path, file_xml):
+    def from_xml(cls, file_xml):
+        base_path = file_xml.find('base-path').text
         rel_path = file_xml.find('rel-path').text
         create_timestamp = file_xml.find('create-timestamp').text
         create_date = datetime.fromtimestamp(float(create_timestamp))
@@ -162,6 +169,6 @@ class Directory(FSObject):
             logging.error(msg)
 
     @classmethod
-    def from_db_row(cls, base_path, row):
-        return cls(base_path=base_path, rel_path=row['path'],
+    def from_db_row(cls, row):
+        return cls(base_path=row['base_path'], rel_path=row['path'],
                    create_date=row['create_time'], modify_date=row['modify_time'])

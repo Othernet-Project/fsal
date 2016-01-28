@@ -5,6 +5,7 @@ import shutil
 import logging
 import time
 import collections
+import functools
 from itertools import ifilter
 
 import gevent.queue
@@ -54,7 +55,8 @@ def yielding_checked_fnwalk(path, fn, sleep_interval=0.01):
                         yield entry
                 gevent.sleep(sleep_interval)
     except Exception as e:
-        logging.exception('Exception while directory walking: {}'.format(str(e)))
+        logging.exception(
+            'Exception while directory walking: {}'.format(str(e)))
 
 
 class FSDBManager(object):
@@ -71,11 +73,15 @@ class FSDBManager(object):
     SLEEP_INTERVAL = 0.500
 
     def __init__(self, config, context):
-        base_path = os.path.abspath(config['fsal.basepath'])
-        if not os.path.isdir(base_path):
-            raise RuntimeError('Invalid basepath: "%s"' % (base_path))
+        paths = config['fsal.basepaths']
+        base_paths = map(os.path.abspath, filter(os.path.isdir, paths))
+        if not base_paths:
+            msg = 'No valid path found in basepaths: {}'.format(
+                ', '.join(paths))
+            raise RuntimeError(msg)
 
-        self.base_path = base_path
+        self.base_paths = base_paths
+        logging.debug('Using basepaths: {}'.format(', '.join(base_paths)))
         self.db = context['databases'].fs
         self.bundles_dir = config['bundles.bundles_dir']
         blacklist = config['fsal.blacklist']
@@ -84,11 +90,12 @@ class FSDBManager(object):
             valid, p = self._validate_path(p)
             if valid:
                 sanitized_blacklist.append(p)
-        self.bundle_ext = BundleExtracter(config, base_path)
+        self.bundle_ext = BundleExtracter(config)
         sanitized_blacklist.append(self.bundle_ext.bundles_dir)
         self.blacklist = sanitized_blacklist
 
-        self.notification_listener = ONDDNotificationListener(config, self._handle_notifications)
+        self.notification_listener = ONDDNotificationListener(
+            config, self._handle_notifications)
         self.event_queue = FileSystemEventQueue(config, context)
         self.scheduler = TaskScheduler(0.2)
 
@@ -101,7 +108,8 @@ class FSDBManager(object):
 
     def get_root_dir(self):
         try:
-            d = Directory.from_path(self.base_path, '.')
+            # Root dir is a empty directory used only for maintaining the id 0
+            d = Directory.from_path(self.base_paths[0], self.ROOT_DIR_PATH)
             d.__id = 0
             return d
         except OSError:
@@ -149,9 +157,13 @@ class FSDBManager(object):
             if not valid:
                 return False
             else:
-                full_path = os.path.abspath(os.path.join(self.base_path,
-                                                         path))
-                return os.path.exists(full_path)
+                for base_path in self.base_paths:
+                    full_path = os.path.abspath(os.path.join(base_path,
+                                                             path))
+                    if os.path.exists(full_path):
+                        return True
+                else:
+                    return False
         else:
             return (self.get_fso(path) is not None)
 
@@ -187,7 +199,9 @@ class FSDBManager(object):
             return (success, msg)
 
         abs_src = os.path.abspath(src)
-        abs_dest = os.path.abspath(os.path.join(self.base_path, dest))
+        # Assume that the last mentioned path is expected destination
+        base_path = self.base_paths[-1]
+        abs_dest = os.path.abspath(os.path.join(base_path, dest))
         logging.debug('Transferring content from "%s" to "%s"' % (abs_src,
                                                                   abs_dest))
         real_dst = abs_dest
@@ -201,7 +215,7 @@ class FSDBManager(object):
             msg = str(e)
 
         # Find the deepest parent in hierarchy which has been indexed
-        path = os.path.relpath(real_dst, self.base_path)
+        path = os.path.relpath(real_dst, base_path)
         path = self._deepest_indexed_parent(path)
         logging.debug('Indexing %s' % path)
         self._update_db_async(path)
@@ -212,6 +226,9 @@ class FSDBManager(object):
 
     def confirm_changes(self, limit=100):
         return self.event_queue.delitems(limit)
+
+    def refresh(self):
+        self._refresh_db_async()
 
     def refresh_path(self, path):
         valid, path = self._validate_path(path)
@@ -228,7 +245,8 @@ class FSDBManager(object):
                 if self._is_bundle(path):
                     extracted_path = self._handle_bundle(path)
                     if not extracted_path:
-                        logging.warn('Could not process bundle {}. Skipping...'.format(path))
+                        logging.warn(
+                            'Could not process bundle {}. Skipping...'.format(path))
                         continue
                     path = extracted_path
                 # Find the deepest parent in hierarchy which has been indexed
@@ -240,8 +258,8 @@ class FSDBManager(object):
             except:
                 logging.exception('Unexpected error in handling notification')
 
-    def _is_bundle(self, path):
-        return self.bundle_ext.is_bundle(path)
+    def _is_bundle(self, base_path, path):
+        return self.bundle_ext.is_bundle(base_path, path)
 
     def _handle_bundle(self, path):
         success, paths = self.bundle_ext.extract_bundle(path)
@@ -250,7 +268,8 @@ class FSDBManager(object):
                 abspath = self.bundle_ext.abspath(path)
                 os.remove(abspath)
             except OSError as e:
-                logging.exception('Exception while removing bundle after extraction: {}'.format(str(e)))
+                logging.exception(
+                    'Exception while removing bundle after extraction: {}'.format(str(e)))
             return common_ancestor(*paths)
         return None
 
@@ -261,9 +280,12 @@ class FSDBManager(object):
             path = path.strip()
             path = path.lstrip(os.sep)
             path = path.rstrip(os.sep)
-            full_path = os.path.abspath(os.path.join(self.base_path, path))
-            valid = full_path.startswith(self.base_path)
-            path = os.path.relpath(full_path, self.base_path)
+            # This checks for paths which escape the base path, so test against
+            # any path is valid
+            base_path = self.base_paths[0]
+            full_path = os.path.abspath(os.path.join(base_path, path))
+            valid = full_path.startswith(base_path)
+            path = os.path.relpath(full_path, base_path)
         return (valid, path)
 
     def _validate_external_path(self, path):
@@ -293,16 +315,17 @@ class FSDBManager(object):
     def _construct_fso(self, row):
         type = row['type']
         cls = Directory if type == self.DIR_TYPE else File
-        fso = cls.from_db_row(self.base_path, row)
+        fso = cls.from_db_row(row)
         fso.__id = row['id']
         return fso
 
     def _remove_from_fs(self, fso):
         events = []
         if os.path.isdir(fso.path):
-            for entry in yielding_checked_fnwalk(fso.path, self._fnwalk_checker):
+            checker = functools.partial(self._fnwalk_checker, fso.base_path)
+            for entry in yielding_checked_fnwalk(fso.path, checker):
                 path = entry.path
-                rel_path = os.path.relpath(path, self.base_path)
+                rel_path = os.path.relpath(path, fso.base_path)
                 if entry.is_dir():
                     event = DirDeletedEvent(rel_path)
                 else:
@@ -310,7 +333,7 @@ class FSDBManager(object):
                 events.append(event)
         else:
             events.append(FileDeletedEvent(os.path.relpath(fso.path,
-                                                           self.base_path)))
+                                                           fso.base_path)))
         remover = shutil.rmtree if fso.is_dir() else os.remove
         remover(fso.path)
         return events
@@ -353,7 +376,8 @@ class FSDBManager(object):
         if not dest_valid:
             return (False, u'Invalid transfer destination directory %s' % dest)
 
-        abs_dest = os.path.abspath(os.path.join(self.base_path, dest))
+        base_path = self.base_paths[-1]
+        abs_dest = os.path.abspath(os.path.join(base_path, dest))
         real_dst = abs_dest
         if os.path.isdir(abs_dest):
             real_dst = os.path.join(abs_dest, asyncfs.basename(abs_src))
@@ -383,14 +407,15 @@ class FSDBManager(object):
         logging.debug('DB refreshed in %0.3f ms' % ((end - start) * 1000))
 
     def _prune_db(self, batch_size=1000):
-        q = self.db.Select('path', sets=self.FS_TABLE)
+        q = self.db.Select('base_path, path', sets=self.FS_TABLE)
         removed_paths = []
         for result in self.db.fetchiter(q):
             path = result['path']
-            full_path = os.path.join(self.base_path, path)
-            if not os.path.exists(full_path) or self._is_blacklisted(path):
+            base_path = result['base_path'] or ''
+            full_path = os.path.join(base_path, path)
+            if base_path not in self.base_paths or not os.path.exists(full_path) or self._is_blacklisted(path):
                 logging.debug('Removing db entry for "%s"' % path)
-                removed_paths.append(path)
+                removed_paths.append((base_path, path))
             if len(removed_paths) >= batch_size:
                 self._remove_paths(removed_paths)
                 removed_paths = []
@@ -399,10 +424,10 @@ class FSDBManager(object):
 
     def _remove_paths(self, paths):
         q = self.db.Delete(self.FS_TABLE, where='path = %s')
-        self.db.executemany(q, ((p,) for p in paths))
+        self.db.executemany(q, ((p,) for _, p in paths))
         events = []
-        for p in paths:
-            abs_p = os.path.abspath(os.path.join(self.base_path, p))
+        for b, p in paths:
+            abs_p = os.path.abspath(os.path.join(b, p))
             if os.path.isdir(abs_p):
                 event = DirDeletedEvent(p)
             else:
@@ -413,30 +438,36 @@ class FSDBManager(object):
     def _update_db_async(self, src_path=ROOT_DIR_PATH):
         self.scheduler.schedule(self._update_db, args=(src_path,))
 
-    def _fnwalk_checker(self, entry):
+    def _fnwalk_checker(self, base_path, entry):
         path = entry.path
-        result = (path != self.base_path and not entry.is_symlink())
-        rel_path = os.path.relpath(path, self.base_path)
+        result = (path not in self.base_paths and not entry.is_symlink())
+        rel_path = os.path.relpath(path, base_path)
         result = result and not self._is_blacklisted(rel_path)
         return result
 
     def _update_db(self, src_path=ROOT_DIR_PATH):
-        src_path = os.path.abspath(os.path.join(self.base_path, src_path))
+        for base_path in self.base_paths:
+            self._update_db_for_basepath(base_path, src_path)
+
+    def _update_db_for_basepath(self, base_path, src_path):
+        src_path = os.path.abspath(os.path.join(base_path, src_path))
         src_path = to_unicode(src_path)
         if not os.path.exists(src_path):
             logging.error('Cannot index "%s". Path does not exist' % src_path)
             return
         id_cache = FIFOCache(1024)
         try:
-            for entry in yielding_checked_fnwalk(src_path, self._fnwalk_checker):
+            checker = functools.partial(self._fnwalk_checker, base_path)
+            for entry in yielding_checked_fnwalk(src_path, checker):
                 path = entry.path
-                rel_path = os.path.relpath(path, self.base_path)
+                rel_path = os.path.relpath(path, base_path)
                 parent_path = os.path.dirname(rel_path)
                 parent_id = id_cache[parent_path] if parent_path in id_cache else None
                 if entry.is_dir():
-                    fso = Directory.from_stat(self.base_path, rel_path, entry.stat())
+                    fso = Directory.from_stat(
+                        base_path, rel_path, entry.stat())
                 else:
-                    fso = File.from_stat(self.base_path, rel_path, entry.stat())
+                    fso = File.from_stat(base_path, rel_path, entry.stat())
                 old_fso = self.get_fso(rel_path)
                 if not old_fso:
                     event_cls = DirCreatedEvent if fso.is_dir() else FileCreatedEvent
@@ -453,20 +484,26 @@ class FSDBManager(object):
             logging.exception('Exception while indexing "%s"' % src_path)
 
     def _extract_bundles(self):
-        def bundle_checker(entry):
-            path = os.path.relpath(entry.path, self.base_path)
-            return self._is_bundle(path)
-        try:
-            path = os.path.abspath(os.path.join(self.base_path, self.bundles_dir))
-            for entry in yielding_checked_fnwalk(path, bundle_checker):
-                try:
-                    path = os.path.relpath(entry.path, self.base_path)
-                    logging.debug('Extracting bundle {}'.format(path))
-                    self._handle_bundle(path)
-                except Exception as e:
-                    logging.exception('Unexpected exception while extracing bundle {}: {}'.format(path, str(e)))
-        except Exception as e:
-            logging.exception('Unexpected exception while extracing bundles {}'.format(str(e)))
+        def bundle_checker(base_path, entry):
+            path = os.path.relpath(entry.path, base_path)
+            return self._is_bundle(base_path, path)
+
+        for base_path in self.base_paths:
+            try:
+                path = os.path.abspath(
+                    os.path.join(base_path, self.bundles_dir))
+                checker = functools.partial(bundle_checker, base_path)
+                for entry in yielding_checked_fnwalk(path, checker):
+                    try:
+                        path = os.path.relpath(entry.path, base_path)
+                        logging.debug('Extracting bundle {}'.format(path))
+                        self._handle_bundle(path)
+                    except Exception as e:
+                        logging.exception(
+                            'Unexpected exception while extracing bundle {}: {}'.format(path, str(e)))
+            except Exception as e:
+                logging.exception(
+                    'Unexpected exception while extracing bundles in {}: {}'.format(base_path, str(e)))
 
     def _update_fso_entry(self, fso, parent_id=None, old_entry=None):
         if not parent_id:
@@ -481,18 +518,20 @@ class FSDBManager(object):
             'size': fso.size,
             'create_time': fso.create_date,
             'modify_time': fso.modify_date,
-            'path': fso.rel_path
+            'path': fso.rel_path,
+            'base_path': fso.base_path
         }
 
         if old_entry:
-            sql_params = { k: '%({})s'.format(k) for k, v in vals.items() }
-            q = self.db.Update(self.FS_TABLE, where='id = %(id)s', **sql_params)
+            sql_params = {k: '%({})s'.format(k) for k, v in vals.items()}
+            q = self.db.Update(
+                self.FS_TABLE, where='id = %(id)s', **sql_params)
             vals['id'] = old_entry.__id
             self.db.execute(q, vals)
             return old_entry.__id
         else:
             cols = ['parent_id', 'type', 'name', 'size', 'create_time',
-                    'modify_time', 'path']
+                    'modify_time', 'path', 'base_path']
             q = self.db.Insert(self.FS_TABLE, cols=cols)
             raw_query = '{} RETURNING id;'.format(q.serialize()[:-1])
             result = self.db.fetchone(raw_query, vals)

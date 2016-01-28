@@ -56,8 +56,7 @@ class DirectoryListingCommandHandler(CommandHandler):
                 dirs.append(fso)
             else:
                 files.append(fso)
-        params = {'base_path': self.fs_mgr.base_path, 'dirs': dirs,
-                  'files': files}
+        params = {'dirs': dirs, 'files': files}
 
         return self.send_result(success=success, params=params)
 
@@ -84,8 +83,7 @@ class SearchCommandHandler(CommandHandler):
                 dirs.append(fso)
             else:
                 files.append(fso)
-        params = {'base_path': self.fs_mgr.base_path, 'dirs': dirs,
-                  'files': files, 'is_match': is_match}
+        params = {'dirs': dirs, 'files': files, 'is_match': is_match}
 
         return self.send_result(success=True, params=params)
 
@@ -170,7 +168,7 @@ class GetFSOCommandHandler(CommandHandler):
         fso = self.fs_mgr.get_fso(path)
         success = fso is not None
         if success:
-            params = {'base_path': self.fs_mgr.base_path}
+            params = dict()
             key = 'dir' if fso.is_dir() else 'file'
             params[key] = fso
         else:
@@ -217,6 +215,14 @@ class RefreshPathCommandHandler(CommandHandler):
         success, msg = self.fs_mgr.refresh_path(path)
         params = {'error': msg}
         return self.send_result(success=success, params=params)
+
+
+class RefreshCommandHandler(CommandHandler):
+    command_type = commandtypes.COMMAND_TYPE_REFRESH
+
+    def do_command(self):
+        self.fs_mgr.refresh()
+        return self.send_result(success=True, params={})
 
 
 class CommandHandlerFactory(object):
