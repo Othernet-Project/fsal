@@ -6,6 +6,7 @@ import logging
 import time
 import collections
 import functools
+import fnmatch
 from itertools import ifilter
 
 import gevent.queue
@@ -315,7 +316,7 @@ class FSDBManager(object):
         return path
 
     def _is_blacklisted(self, path):
-        return any((common_ancestor(p, path) != '' for p in self.blacklist))
+        return any((fnmatch.fnmatch(path, p) for p in self.blacklist))
 
     def _construct_fso(self, row):
         type = row['type']
