@@ -453,7 +453,9 @@ class FSDBManager(object):
 
     def _update_db(self, src_path=ROOT_DIR_PATH):
         for base_path in self.base_paths:
-            self._update_db_for_basepath(base_path, src_path)
+            abspath = os.path.abspath(os.path.join(base_path, src_path))
+            if os.path.exists(abspath):
+                self._update_db_for_basepath(base_path, src_path)
 
     def _update_db_for_basepath(self, base_path, src_path):
         src_path = os.path.abspath(os.path.join(base_path, src_path))
