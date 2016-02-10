@@ -6,7 +6,6 @@ import logging
 import time
 import collections
 import functools
-import fnmatch
 from itertools import ifilter
 
 import gevent.queue
@@ -85,20 +84,26 @@ class FSDBManager(object):
         logging.debug('Using basepaths: {}'.format(', '.join(base_paths)))
         self.db = context['databases'].fs
         self.bundles_dir = config['bundles.bundles_dir']
-        blacklist = config['fsal.blacklist']
-        sanitized_blacklist = []
-        for p in blacklist:
-            valid, p = self._validate_path(p)
-            if valid:
-                sanitized_blacklist.append(p)
         self.bundle_ext = BundleExtracter(config)
-        sanitized_blacklist.append(self.bundle_ext.bundles_dir)
-        self.blacklist = sanitized_blacklist
+
+        blacklist = config['fsal.blacklist']
+        blacklist.append(self.bundle_ext.bundles_dir)
+        self.blacklist = blacklist
 
         self.notification_listener = ONDDNotificationListener(
             config, self._handle_notifications)
         self.event_queue = FileSystemEventQueue(config, context)
         self.scheduler = TaskScheduler(0.2)
+
+    @property
+    def blacklist(self):
+        return self.__blacklist
+
+    @blacklist.setter
+    def blacklist(self, blacklist):
+        self.__blacklist = blacklist
+        self.__blacklist_rx = [re.compile(
+            pattern, re.IGNORECASE) for pattern in blacklist]
 
     def start(self):
         self.notification_listener.start()
@@ -316,7 +321,8 @@ class FSDBManager(object):
         return path
 
     def _is_blacklisted(self, path):
-        return any((fnmatch.fnmatch(path, p) for p in self.blacklist))
+        # match() is used to ensure matches start from beginning of the path
+        return any((p.match(path) for p in self.__blacklist_rx))
 
     def _construct_fso(self, row):
         type = row['type']
