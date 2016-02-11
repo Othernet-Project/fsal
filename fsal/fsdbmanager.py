@@ -87,7 +87,7 @@ class FSDBManager(object):
         self.bundle_ext = BundleExtracter(config)
 
         blacklist = list()
-        blacklist.append(config['fsal.blacklist'])
+        blacklist.extend(config['fsal.blacklist'])
         blacklist.append(self.bundle_ext.bundles_dir)
         self.blacklist = blacklist
 
@@ -102,7 +102,7 @@ class FSDBManager(object):
 
     @blacklist.setter
     def blacklist(self, blacklist):
-        self.__blacklist = [pattern for pattern in blacklist if pattern]
+        self.__blacklist = [pattern for pattern in set(blacklist) if pattern]
         self.__blacklist_rx = [re.compile(
             pattern, re.IGNORECASE) for pattern in self.__blacklist]
 
