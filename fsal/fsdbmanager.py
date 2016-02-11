@@ -86,7 +86,8 @@ class FSDBManager(object):
         self.bundles_dir = config['bundles.bundles_dir']
         self.bundle_ext = BundleExtracter(config)
 
-        blacklist = config['fsal.blacklist']
+        blacklist = list()
+        blacklist.append(config['fsal.blacklist'])
         blacklist.append(self.bundle_ext.bundles_dir)
         self.blacklist = blacklist
 
@@ -101,9 +102,9 @@ class FSDBManager(object):
 
     @blacklist.setter
     def blacklist(self, blacklist):
-        self.__blacklist = blacklist
+        self.__blacklist = [pattern for pattern in blacklist if pattern]
         self.__blacklist_rx = [re.compile(
-            pattern, re.IGNORECASE) for pattern in blacklist]
+            pattern, re.IGNORECASE) for pattern in self.__blacklist]
 
     def start(self):
         self.notification_listener.start()
