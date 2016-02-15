@@ -30,7 +30,7 @@ import xml.etree.ElementTree as ET
 from gevent.server import StreamServer
 
 from .xmlparser import parsestring
-from .confloader import ConfDict
+from librarian_core.confloader import ConfDict
 from .handlers import CommandHandlerFactory
 from .responses import CommandResponseFactory
 from .fsdbmanager import FSDBManager
