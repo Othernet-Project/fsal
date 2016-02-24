@@ -88,6 +88,13 @@ class SearchCommandHandler(CommandHandler):
         return self.send_result(success=True, params=params)
 
 
+class ListBasePathsCommandHandler(CommandHandler):
+    command_type = commandtypes.COMMAND_TYPE_LIST_BASE_PATHS
+
+    def do_command(self):
+        return self.send_result(success=True, params={'paths':
+                                                       self.fs_mgr.base_paths})
+
 class CopyCommandHandler(CommandHandler):
     command_type = commandtypes.COMMAND_TYPE_COPY
 

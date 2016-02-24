@@ -184,6 +184,18 @@ class FSAL(object):
         error = error_node.text
         return (success, error)
 
+    def _parse_base_paths_response(self, response_xml):
+        success_node = response_xml.find('.//success')
+        success = str_to_bool(success_node.text)
+        params_node = response_xml.find('.//params')
+        path_nodes = params_node.findall('.//path')
+        paths = [p.text for p in path_nodes]
+        return success, paths
+
+    @command(commandtypes.COMMAND_TYPE_LIST_BASE_PATHS, _parse_base_paths_response)
+    def list_base_paths(self):
+        return {}
+
     @command(commandtypes.COMMAND_TYPE_LIST_DIR, _parse_list_dir_response)
     def list_dir(self, path):
         return {'path': path}

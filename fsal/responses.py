@@ -90,6 +90,19 @@ def add_event_node(parent_node, event):
     is_dir_node.text = to_unicode(event.is_dir).lower()
 
 
+class ListBasePathsResponse(GenericResponse):
+
+    def get_xml(self):
+        root = create_response_xml_root()
+        result_node = SubElement(root, u'result')
+        success_node = SubElement(result_node, u'success')
+        success = self.response_data['success']
+        success_node.text = to_unicode(success).lower()
+        if success:
+            return self.response_data['base_paths']
+        return root
+
+
 class DirectoryListingResponse(GenericResponse):
 
     def get_xml(self):
