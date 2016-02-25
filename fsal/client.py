@@ -204,6 +204,7 @@ class FSAL(object):
 
     @command(commandtypes.COMMAND_TYPE_LIST_BASE_PATHS, _parse_base_paths_response)
     def list_base_paths(self):
+        """ Returns a list of all registered base paths in FSAL """
         return {}
 
     @command(commandtypes.COMMAND_TYPE_LIST_DIR, _parse_list_dir_response)
