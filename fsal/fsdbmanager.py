@@ -200,6 +200,46 @@ class FSDBManager(object):
         else:
             return self._remove_fso(fso)
 
+    def _validate_consolidation(self, src, dest):
+        src_valid, abs_src = self._validate_external_path(src)
+        dest_valid, dest = self._validate_path(dest)
+
+        base_path = self.base_paths[-1]
+        abs_dest = os.path.abspath(os.path.join(base_path, dest))
+        real_dst = abs_dest
+        if os.path.isdir(abs_dest):
+            real_dst = os.path.join(abs_dest, asyncfs.basename(abs_src))
+            if os.path.exists(real_dst):
+                return (False,
+                        'Destination path "%s" already exists' % real_dst)
+
+        for entry in yielding_checked_fnwalk(abs_src, lambda p: True):
+            path = entry.path
+            path = os.path.relpath(path, abs_src)
+            dest_path = os.path.abspath(os.path.join(real_dst, path))
+            if len(to_bytes(dest_path)) > self.PATH_LEN_LIMIT:
+                msg = '%s exceeds path length limit' % dest_path
+                return (False, msg)
+        return (True, None)
+
+    def consolidate(self, src, dest):
+        for s in src:
+            names = os.listdir(s)
+            for n in names:
+                source = os.path.join(s, n)
+                destination = os.path.join(dest, n)
+                ok = self._validate_transfer(source, destination)
+                assert ok[0], ok[1]
+                if os.path.isdir(source):
+                    if _destinsrc(s, destination):
+                        raise Error("Destination path '%s' already exists" %
+                                    destination)
+                copytree(source, destination, symlinks=True)
+                refresh = self.refresh_path(destination)
+                assert refresh, "unable to refresh '%s'" % destination
+                rmtree(source)
+        return True
+
     def transfer(self, src, dest):
         success, msg = self._validate_transfer(src, dest)
         if not success:
