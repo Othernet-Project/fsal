@@ -192,6 +192,16 @@ class FSAL(object):
         paths = [p.text for p in path_nodes]
         return success, paths
 
+    def _parse_consolidate_response(self, response_xml):
+        success_node = response_xml.find('.//success')
+        success = str_to_bool(success_node.text)
+        return success
+
+    @command(commandtypes.COMMAND_TYPE_CONSOLIDATE, _parse_consolidate_response)
+    def consolidate(self, sources, destination):
+        """ Moves content from a list of sources to a single destination """
+        return {'sources': sources, 'dest': destination}
+
     @command(commandtypes.COMMAND_TYPE_LIST_BASE_PATHS, _parse_base_paths_response)
     def list_base_paths(self):
         return {}
