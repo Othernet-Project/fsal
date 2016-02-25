@@ -95,6 +95,25 @@ class ListBasePathsCommandHandler(CommandHandler):
         return self.send_result(success=True, params={'paths':
                                                        self.fs_mgr.base_paths})
 
+
+class ConsolidateCommandHandler(CommandHandler):
+    command_type = commandtypes.COMMAND_TYPE_CONSOLIDATE
+
+    def do_command(self):
+        sources = []
+        for src in sources:
+            names = os.listdir(src)
+            for name in names:
+                sources.append(os.path.join(src, name))
+        # fire notification
+        # Should check total operation size, if there is enough diskspace
+        source_paths = [s.data for s in self.command_data.params.sources.children]
+        # should grab a list of all files present at the root of the directory
+        dest_path = self.command_data.params.dest.data
+        resp = self.fs_mgr.consolidate(source_paths, dest_path)
+        return self.send_result(success=resp)
+
+
 class CopyCommandHandler(CommandHandler):
     command_type = commandtypes.COMMAND_TYPE_COPY
 
