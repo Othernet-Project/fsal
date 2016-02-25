@@ -15,6 +15,7 @@ from .utils import to_unicode, to_bytes, common_ancestor
 from .fs import File, Directory
 from .ondd import ONDDNotificationListener
 from .bundles import BundleExtracter, abs_bundle_path
+from .asyncfs import copytree, rmtree, Error, _destinsrc
 from .events import FileCreatedEvent, FileDeletedEvent, FileModifiedEvent, \
     DirCreatedEvent, DirModifiedEvent, DirDeletedEvent, FileSystemEventQueue
 
