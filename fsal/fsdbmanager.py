@@ -229,7 +229,7 @@ class FSDBManager(object):
             for n in names:
                 source = os.path.join(s, n)
                 destination = os.path.join(dest, n)
-                ok = self._validate_transfer(source, destination)
+                ok = self._validate_consolidation(source, destination)
                 assert ok[0], ok[1]
                 if os.path.isdir(source):
                     if _destinsrc(s, destination):
