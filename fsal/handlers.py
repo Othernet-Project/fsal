@@ -96,6 +96,15 @@ class ListBasePathsCommandHandler(CommandHandler):
                                                        self.fs_mgr.base_paths})
 
 
+class GetPathSizeCommandHandler(CommandHandler):
+    command_type = commandtypes.COMMAND_TYPE_GET_PATH_SIZE
+
+    def do_command(self):
+        path = self.command_data.params.path.data
+        resp = self.fs_mgr.get_path_size(path)
+        return self.send_result(success=resp)
+
+
 class ConsolidateCommandHandler(CommandHandler):
     command_type = commandtypes.COMMAND_TYPE_CONSOLIDATE
 
