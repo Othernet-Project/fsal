@@ -214,8 +214,8 @@ class FSDBManager(object):
                         raise Error("Destination path '%s' already exists" %
                                     destination)
                 copytree(source, destination, symlinks=True)
-                refresh = self.refresh_path(destination)
-                assert refresh, "unable to refresh '%s'" % destination
+                self.refresh_path(destination)
+                self.refresh_path(s)
                 rmtree(source)
         return True
 
