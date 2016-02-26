@@ -201,6 +201,20 @@ class FSDBManager(object):
         else:
             return self._remove_fso(fso)
 
+    def get_path_size(self, path):
+        size = 0
+        abs_src = os.path.abspath(path)
+        for entry in yielding_checked_fnwalk(abs_src, lambda p: True):
+            print(entry.path)
+            if entry.is_dir():
+                print('is a directory')
+                continue
+            elif entry.is_file():
+                print('is a file')
+                size += entry.stat().st_size
+        print(size)
+        return size
+
     def consolidate(self, src, dest):
         for s in src:
             names = os.listdir(s)
