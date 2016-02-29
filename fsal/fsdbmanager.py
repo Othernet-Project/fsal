@@ -222,16 +222,18 @@ class FSDBManager(object):
                 source = os.path.join(s, n)
                 destination = os.path.join(dest, n)
                 ok = self._validate_transfer(source, destination)
-                assert ok[0], ok[1]
+                if not ok[0]:
+                    return False, ok[1]
                 if os.path.isdir(source):
                     if _destinsrc(s, destination):
-                        raise Error("Destination path '%s' already exists" %
+                        return False, ("Destination path '%s' already exists" %
                                     destination)
                 copytree(source, destination, symlinks=True)
                 self.refresh_path(destination)
                 self.refresh_path(s)
                 rmtree(source)
-        return True
+        return True, 'all files from {} copied to {} successfully'.format(src,
+                                                                          dest)
 
     def transfer(self, src, dest):
         success, msg = self._validate_transfer(src, dest)
