@@ -94,13 +94,14 @@ class ConsolidateResponse(GenericResponse):
 
     def get_xml(self):
         root = create_response_xml_root()
+        data = self.response_data['success']
         result_node = SubElement(root, u'result')
+
         success_node = SubElement(result_node, u'success')
-        success = self.response_data['success']
-        success_node.text = to_unicode(success).lower()
-        if success:
-            return True
-        return False
+        success_node.text = to_unicode(data[0]).lower()
+        msg_node = SubElement(result_node, u'message')
+        msg_node.text = data[1]
+        return root
 
 
 class GetPathSizeResponse(GenericResponse):
@@ -213,6 +214,7 @@ class GetChangesResponse(GenericResponse):
 class CommandResponseFactory:
     default_response_generator = GenericResponse
     response_map = {
+        commandtypes.COMMAND_TYPE_CONSOLIDATE: ConsolidateResponse,
         commandtypes.COMMAND_TYPE_LIST_DIR: DirectoryListingResponse,
         commandtypes.COMMAND_TYPE_SEARCH: SearchResponse,
         commandtypes.COMMAND_TYPE_GET_FSO: GetFSOResponse,
