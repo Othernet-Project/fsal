@@ -218,13 +218,17 @@ class FSDBManager(object):
                 return False, msg
             try:
                 src, dest = map(os.path.abspath, (src, dest))
-                logging.debug('Consolidation started from {} to {}'.format(src, dest))
+                logging.debug(
+                    'Consolidation started from {} to {}'.format(
+                        src, dest))
                 asyncfs.copytree(src, dest, merge=True)
                 # Remove contents of src but not the folder itself
                 for name in os.listdir(src):
                     asyncfs.rm(os.path.join(src, name))
             except Exception:
-                logging.exception('Unexpected error while consolidating from {} to {}'.format(src, dest))
+                logging.exception(
+                    'Unexpected error while consolidating from {} to {}'.format(
+                        src, dest))
             finally:
                 self._prune_db_async(src)
         self.refresh_path(base_paths=(dest,))
