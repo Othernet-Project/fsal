@@ -63,7 +63,7 @@ def copyfile(src, dst):
             copyfileobj(fsrc, fdst)
 
 
-def copytree(src, dst, symlinks=False, ignore=None):
+def copytree(src, dst, symlinks=False, ignore=None, merge=False):
     """Recursively copy a directory tree using copy2().
 
     The destination directory must not already exist.
@@ -95,7 +95,11 @@ def copytree(src, dst, symlinks=False, ignore=None):
     else:
         ignored_names = set()
 
-    os.makedirs(dst)
+    try:
+        os.makedirs(dst)
+    except os.error as e:
+        if not merge:
+            raise Error(e)
     errors = []
     for name in names:
         if name in ignored_names:
@@ -107,14 +111,14 @@ def copytree(src, dst, symlinks=False, ignore=None):
                 linkto = os.readlink(srcname)
                 os.symlink(linkto, dstname)
             elif os.path.isdir(srcname):
-                copytree(srcname, dstname, symlinks, ignore)
+                copytree(srcname, dstname, symlinks, ignore, merge)
                 gevent.sleep(SLEEP_INTERVAL)
             else:
                 # Will raise a SpecialFileError for unsupported file types
                 copy(srcname, dstname)
         # catch the Error from the recursive copytree so that we can
         # continue with other files
-        except Error, err:
+        except Error as err:
             errors.extend(err.args[0])
         except EnvironmentError, why:
             errors.append((srcname, dstname, str(why)))
@@ -128,6 +132,16 @@ def copytree(src, dst, symlinks=False, ignore=None):
             errors.append((src, dst, str(why)))
     if errors:
         raise Error(errors)
+
+
+def rm(path, **kwargs):
+    """
+    Helper function to invoke correct remover function for files and dirs
+    """
+    if os.path.isdir(path):
+        rmtree(path)
+    else:
+        os.remove(path)
 
 
 def rmtree(path, ignore_errors=False, onerror=None):

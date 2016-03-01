@@ -15,6 +15,7 @@ from .utils import to_unicode, to_bytes, common_ancestor
 from .fs import File, Directory
 from .ondd import ONDDNotificationListener
 from .bundles import BundleExtracter, abs_bundle_path
+from .asyncfs import copytree, rmtree, Error, _destinsrc
 from .events import FileCreatedEvent, FileDeletedEvent, FileModifiedEvent, \
     DirCreatedEvent, DirModifiedEvent, DirDeletedEvent, FileSystemEventQueue
 
@@ -200,6 +201,40 @@ class FSDBManager(object):
         else:
             return self._remove_fso(fso)
 
+    def get_path_size(self, path):
+        size = 0
+        abs_src = os.path.abspath(path)
+        for entry in yielding_checked_fnwalk(abs_src, lambda p: True):
+            if entry.is_dir():
+                continue
+            elif entry.is_file():
+                size += entry.stat().st_size
+        return size
+
+    def consolidate(self, sources, dest):
+        for src in sources:
+            valid, msg = self._validate_transfer(src, dest)
+            if not valid:
+                return False, msg
+            try:
+                src, dest = map(os.path.abspath, (src, dest))
+                logging.debug(
+                    'Consolidation started from {} to {}'.format(
+                        src, dest))
+                asyncfs.copytree(src, dest, merge=True)
+                # Remove contents of src but not the folder itself
+                for name in os.listdir(src):
+                    asyncfs.rm(os.path.join(src, name))
+            except Exception:
+                logging.exception(
+                    'Unexpected error while consolidating from {} to {}'.format(
+                        src, dest))
+            finally:
+                self._prune_db_async(src)
+        self.refresh_path(base_paths=(dest,))
+        return True, 'All files from {} copied to {} successfully'.format(src,
+                                                                          dest)
+
     def transfer(self, src, dest):
         success, msg = self._validate_transfer(src, dest)
         if not success:
@@ -237,11 +272,16 @@ class FSDBManager(object):
     def refresh(self):
         self._refresh_db_async()
 
-    def refresh_path(self, path):
-        valid, path = self._validate_path(path)
+    def refresh_path(self, src_path=None, base_paths=None):
+        src_path = src_path or self.ROOT_DIR_PATH
+        base_paths = base_paths or self.base_paths
+        valid, src_path = self._validate_path(src_path)
         if not valid:
-            return (False, ('No such file or directory "%s"' % path))
-        self._update_db_async(path)
+            return (False, ('No such file or directory "%s"' % src_path))
+        base_paths = [p for p in base_paths if p in self.base_paths]
+        for path in base_paths:
+            self._prune_db_async(path)
+        self._update_db_async(src_path, base_paths)
         return (True, None)
 
     def _handle_notifications(self, notifications):
@@ -419,10 +459,16 @@ class FSDBManager(object):
         end = time.time()
         logging.debug('DB refreshed in %0.3f ms' % ((end - start) * 1000))
 
-    def _prune_db(self, batch_size=1000):
+    def _prune_db_async(self, base_path):
+        self.scheduler.schedule(self._prune_db, args=(base_path,))
+
+    def _prune_db(self, base_path=None, batch_size=1000):
         q = self.db.Select('base_path, path', sets=self.FS_TABLE)
+        if base_path:
+            q.where |= 'base_path = %(base_path)s'
+            logging.debug('Prune operation restricted to {}'.format(base_path))
         removed_paths = []
-        for result in self.db.fetchiter(q):
+        for result in self.db.fetchiter(q, dict(base_path=base_path)):
             path = result['path']
             base_path = result['base_path'] or ''
             full_path = os.path.join(base_path, path)
@@ -448,8 +494,8 @@ class FSDBManager(object):
             events.append(event)
         self.event_queue.additems(events)
 
-    def _update_db_async(self, src_path=ROOT_DIR_PATH):
-        self.scheduler.schedule(self._update_db, args=(src_path,))
+    def _update_db_async(self, src_path=ROOT_DIR_PATH, base_paths=None):
+        self.scheduler.schedule(self._update_db, args=(src_path, base_paths))
 
     def _fnwalk_checker(self, base_path, entry):
         path = entry.path
@@ -458,8 +504,9 @@ class FSDBManager(object):
         result = result and not self._is_blacklisted(rel_path)
         return result
 
-    def _update_db(self, src_path=ROOT_DIR_PATH):
-        for base_path in self.base_paths:
+    def _update_db(self, src_path=ROOT_DIR_PATH, base_paths=None):
+        base_paths = base_paths or self.base_paths
+        for base_path in base_paths:
             abspath = os.path.abspath(os.path.join(base_path, src_path))
             if os.path.exists(abspath):
                 self._update_db_for_basepath(base_path, src_path)

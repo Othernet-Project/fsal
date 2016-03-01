@@ -192,8 +192,34 @@ class FSAL(object):
         paths = [p.text for p in path_nodes]
         return success, paths
 
+    def _parse_get_path_size_response(self, response_xml):
+        success_node = response_xml.find('.//success')
+        success = str_to_bool(success_node.text)
+        if not success:
+            return False
+        size = response_xml.find('.//size').text
+        return size
+
+    @command(commandtypes.COMMAND_TYPE_GET_PATH_SIZE, _parse_get_path_size_response)
+    def get_path_size(self, path):
+        """ Moves content from a list of sources to a single destination """
+        return {'path': path}
+
+    def _parse_consolidate_response(self, response_xml):
+        success_node = response_xml.find('.//success')
+        success = str_to_bool(success_node.text)
+        message_node = response_xml.find('.//message')
+        message = message_node.text
+        return success, message
+
+    @command(commandtypes.COMMAND_TYPE_CONSOLIDATE, _parse_consolidate_response)
+    def consolidate(self, sources, destination):
+        """ Moves content from a list of sources to a single destination """
+        return {'sources': sources, 'dest': destination}
+
     @command(commandtypes.COMMAND_TYPE_LIST_BASE_PATHS, _parse_base_paths_response)
     def list_base_paths(self):
+        """ Returns a list of all registered base paths in FSAL """
         return {}
 
     @command(commandtypes.COMMAND_TYPE_LIST_DIR, _parse_list_dir_response)
