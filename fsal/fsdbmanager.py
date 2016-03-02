@@ -215,10 +215,10 @@ class FSDBManager(object):
                     continue
                 elif entry.is_file():
                     size += entry.stat().st_size
+            success = True
         except:
             logging.exception(
                 'Error while calculating path size for {}'.format(path))
-        success = True
         return success, size
 
     def consolidate(self, sources, dest):
