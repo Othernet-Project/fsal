@@ -202,14 +202,24 @@ class FSDBManager(object):
             return self._remove_fso(fso)
 
     def get_path_size(self, path):
-        size = 0
-        abs_src = os.path.abspath(path)
-        for entry in yielding_checked_fnwalk(abs_src, lambda p: True):
-            if entry.is_dir():
-                continue
-            elif entry.is_file():
-                size += entry.stat().st_size
-        return size
+        success, size = False, 0
+        if not os.path.isdir(path):
+            logging.error(
+                'Invalid path \'{}\' for size calculation.'
+                ' It does not exist or is not a directory'.format(path))
+            return success, size
+        try:
+            abs_src = os.path.abspath(path)
+            for entry in yielding_checked_fnwalk(abs_src, lambda p: True):
+                if entry.is_dir():
+                    continue
+                elif entry.is_file():
+                    size += entry.stat().st_size
+        except:
+            logging.exception(
+                'Error while calculating path size for {}'.format(path))
+        success = True
+        return success, size
 
     def consolidate(self, sources, dest):
         for src in sources:
@@ -318,6 +328,7 @@ class FSDBManager(object):
         if success:
             try:
                 abspath = abs_bundle_path(base_path, path)
+                os.remove(abspath)
                 os.remove(abspath)
             except OSError as e:
                 logging.exception(

@@ -195,10 +195,8 @@ class FSAL(object):
     def _parse_get_path_size_response(self, response_xml):
         success_node = response_xml.find('.//success')
         success = str_to_bool(success_node.text)
-        if not success:
-            return False
-        size = response_xml.find('.//size').text
-        return size
+        size = int(response_xml.find('.//size').text)
+        return success, size
 
     @command(commandtypes.COMMAND_TYPE_GET_PATH_SIZE, _parse_get_path_size_response)
     def get_path_size(self, path):

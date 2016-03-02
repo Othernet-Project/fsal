@@ -101,8 +101,8 @@ class GetPathSizeCommandHandler(CommandHandler):
 
     def do_command(self):
         path = self.command_data.params.path.data
-        resp = self.fs_mgr.get_path_size(path)
-        return self.send_result(success=resp)
+        success, size = self.fs_mgr.get_path_size(path)
+        return self.send_result(success=success, size=size)
 
 
 class ConsolidateCommandHandler(CommandHandler):

@@ -104,19 +104,6 @@ class ConsolidateResponse(GenericResponse):
         return root
 
 
-class GetPathSizeResponse(GenericResponse):
-
-    def get_xml(self):
-        root = create_response_xml_root()
-        result_node = SubElement(root, u'result')
-        success_node = SubElement(result_node, u'success')
-        success = self.response_data['success']
-        success_node.text = to_unicode(success).lower()
-        size_node = SubElement(result_node, u'size')
-        size_node.text = self.response_data['size']
-        return root
-
-
 class ListBasePathsResponse(GenericResponse):
 
     def get_xml(self):
