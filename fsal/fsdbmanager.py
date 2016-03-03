@@ -211,10 +211,7 @@ class FSDBManager(object):
         try:
             abs_src = os.path.abspath(path)
             for entry in yielding_checked_fnwalk(abs_src, lambda p: True):
-                if entry.is_dir():
-                    continue
-                elif entry.is_file():
-                    size += entry.stat().st_size
+                size += entry.stat().st_size
             success = True
         except:
             logging.exception(
