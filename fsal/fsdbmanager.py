@@ -19,7 +19,7 @@ from .asyncfs import copytree, rmtree, Error, _destinsrc
 from .events import FileCreatedEvent, FileDeletedEvent, FileModifiedEvent, \
     DirCreatedEvent, DirModifiedEvent, DirDeletedEvent, FileSystemEventQueue
 
-from librarian_core.contrib.tasks.scheduler import TaskScheduler
+from greentasks.scheduler import TaskScheduler
 
 
 SQL_ESCAPE_CHAR = '\\'
