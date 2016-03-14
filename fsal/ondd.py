@@ -46,7 +46,9 @@ class ONDDNotificationListener(object):
                 return False
 
         notifications = filter(filter_file_complete, events_xml)
-        logging.debug('Fetched {} events from ONDD'.format(len(notifications)))
+        len_notices = len(notifications)
+        if len_notices > 0:
+            logging.debug('Fetched {} events from ONDD'.format(len_notices))
 
         if notifications:
             self._handle_notifications(notifications)
