@@ -1,7 +1,7 @@
 import os
 import logging
 
-from datetime import datetime
+from .utils import from_utc_timestamp
 
 
 class FSObject(object):
@@ -90,9 +90,9 @@ class File(FSObject):
         rel_path = file_xml.find('rel-path').text
         size = file_xml.find('size').text
         create_timestamp = file_xml.find('create-timestamp').text
-        create_date = datetime.fromtimestamp(float(create_timestamp))
+        create_date = from_utc_timestamp(create_timestamp)
         modify_timestamp = file_xml.find('modify-timestamp').text
-        modify_date = datetime.fromtimestamp(float(modify_timestamp))
+        modify_date = from_utc_timestamp(modify_timestamp)
         return cls(base_path=base_path, rel_path=rel_path, size=size,
                    create_date=create_date, modify_date=modify_date)
 
@@ -110,8 +110,8 @@ class File(FSObject):
     @classmethod
     def from_stat(cls, base_path, rel_path, stat):
         size = stat.st_size
-        create_date = datetime.fromtimestamp(stat.st_ctime)
-        modify_date = datetime.fromtimestamp(stat.st_mtime)
+        create_date = from_utc_timestamp(stat.st_ctime)
+        modify_date = from_utc_timestamp(stat.st_mtime)
         return cls(base_path=base_path, rel_path=rel_path, size=size,
                     create_date=create_date, modify_date=modify_date)
 
@@ -139,9 +139,9 @@ class Directory(FSObject):
         base_path = file_xml.find('base-path').text
         rel_path = file_xml.find('rel-path').text
         create_timestamp = file_xml.find('create-timestamp').text
-        create_date = datetime.fromtimestamp(float(create_timestamp))
+        create_date = from_utc_timestamp(create_timestamp)
         modify_timestamp = file_xml.find('modify-timestamp').text
-        modify_date = datetime.fromtimestamp(float(modify_timestamp))
+        modify_date = from_utc_timestamp(modify_timestamp)
         return cls(base_path=base_path, rel_path=rel_path,
                    create_date=create_date, modify_date=modify_date)
 
@@ -159,8 +159,8 @@ class Directory(FSObject):
     @classmethod
     def from_stat(cls, base_path, rel_path, stat):
         try:
-            create_date = datetime.fromtimestamp(stat.st_ctime)
-            modify_date = datetime.fromtimestamp(stat.st_mtime)
+            create_date = from_utc_timestamp(stat.st_ctime)
+            modify_date = from_utc_timestamp(stat.st_mtime)
             return cls(base_path=base_path, rel_path=rel_path,
                        create_date=create_date, modify_date=modify_date)
         except OSError as e:

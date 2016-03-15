@@ -1,9 +1,12 @@
 import os
 import sys
+import datetime
 import functools
 import collections
 
 import scandir
+
+from pytz import utc
 
 
 PY2 = sys.version_info.major == 2
@@ -145,3 +148,10 @@ def to_bytes(v, encoding='utf8'):
         return v.encode(encoding, errors='ignore')
     except AttributeError:
         return unicode(v).encode(encoding)
+
+
+def from_utc_timestamp(timestamp):
+    """Converts the passed-in unix UTC timestamp into a datetime object."""
+    dt = datetime.datetime.utcfromtimestamp(float(timestamp))
+    return dt.replace(tzinfo=utc)
+

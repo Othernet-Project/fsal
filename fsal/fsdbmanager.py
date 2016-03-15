@@ -128,7 +128,7 @@ class FSDBManager(object):
         if d is None:
             return (False, [])
         else:
-            q = self.db.Select('*', sets=self.FS_TABLE, where='parent_id = %s')
+            q = self.db.Select('*', sets=self.FS_TABLE, where='parent_id = ?')
             row_iter = self.db.fetchiter(q, (d.__id,))
             return (True, self._fso_row_iterator(row_iter))
 
@@ -139,15 +139,11 @@ class FSDBManager(object):
         else:
             like_pattern = '%s' if whole_words else '%%%s%%'
             words = map(sql_escape_path, query.split())
-            like_words = [(like_pattern % w) for w in words]
+            like_words = [(like_pattern % w if whole_words else w.lower())
+                          for w in words]
             q = self.db.Select('*', sets=self.FS_TABLE)
             for _ in like_words:
-                if whole_words:
-                    where_clause = 'name LIKE %s'
-                else:
-                    where_clause = 'name ILIKE %s'
-                where_clause += ' ESCAPE \'{}\''.format(SQL_ESCAPE_CHAR)
-                q.where |= where_clause
+                q.where |= 'name LIKE ? ESCAPE \'{}\''.format(SQL_ESCAPE_CHAR)
             row_iter = self.db.fetchiter(q, like_words)
             result_gen = self._fso_row_iterator(row_iter)
 
@@ -190,7 +186,7 @@ class FSDBManager(object):
         if path == self.ROOT_DIR_PATH:
             return self.get_root_dir()
         else:
-            q = self.db.Select('*', sets=self.FS_TABLE, where='path = %s')
+            q = self.db.Select('*', sets=self.FS_TABLE, where='path = ?')
             result = self.db.fetchone(q, (path,))
             return self._construct_fso(result) if result else None
 
@@ -404,10 +400,10 @@ class FSDBManager(object):
             events = self._remove_from_fs(fso)
             path = sql_escape_path(fso.rel_path)
             q = self.db.Delete(self.FS_TABLE)
-            q.where = 'path LIKE %s ESCAPE \'{}\''.format(SQL_ESCAPE_CHAR)
+            q.where = 'path LIKE ? ESCAPE \'{}\''.format(SQL_ESCAPE_CHAR)
             if fso.is_dir():
-                pattern = '%s' + os.sep + '%%'
-                count = self.db.executemany(q, (((pattern % path),), (path,)))
+                pattern = os.path.join(path, '%')
+                count = self.db.executemany(q, ((pattern,), (path,)))
             else:
                 count = self.db.execute(q, (path,))
             self.event_queue.additems(events)
@@ -472,11 +468,13 @@ class FSDBManager(object):
 
     def _prune_db(self, base_path=None, batch_size=1000):
         q = self.db.Select('base_path, path', sets=self.FS_TABLE)
+        params = {}
         if base_path:
-            q.where |= 'base_path = %(base_path)s'
+            q.where |= 'base_path = :base_path'
+            params.update(base_path=base_path)
             logging.debug('Prune operation restricted to {}'.format(base_path))
         removed_paths = []
-        for result in self.db.fetchiter(q, dict(base_path=base_path)):
+        for result in self.db.fetchiter(q, params):
             path = result['path']
             base_path = result['base_path'] or ''
             full_path = os.path.join(base_path, path)
@@ -490,7 +488,7 @@ class FSDBManager(object):
             self._remove_paths(removed_paths)
 
     def _remove_paths(self, paths):
-        q = self.db.Delete(self.FS_TABLE, where='path = %s')
+        q = self.db.Delete(self.FS_TABLE, where='path = ?')
         self.db.executemany(q, ((p,) for _, p in paths))
         events = []
         for b, p in paths:
@@ -594,9 +592,9 @@ class FSDBManager(object):
         }
 
         if old_entry:
-            sql_params = {k: '%({})s'.format(k) for k, v in vals.items()}
+            sql_params = {k: ':{}'.format(k) for k, v in vals.items()}
             q = self.db.Update(
-                self.FS_TABLE, where='id = %(id)s', **sql_params)
+                self.FS_TABLE, where='id = :id', **sql_params)
             vals['id'] = old_entry.__id
             self.db.execute(q, vals)
             return old_entry.__id
@@ -604,8 +602,9 @@ class FSDBManager(object):
             cols = ['parent_id', 'type', 'name', 'size', 'create_time',
                     'modify_time', 'path', 'base_path']
             q = self.db.Insert(self.FS_TABLE, cols=cols)
-            raw_query = '{} RETURNING id;'.format(q.serialize()[:-1])
-            result = self.db.fetchone(raw_query, vals)
+            self.db.execute(q, vals)
+            query = self.db.Select(sets=self.FS_TABLE, where='path = :path')
+            result = self.db.fetchone(query, dict(path=vals['path']))
             return result['id']
 
     def _clear_db(self):

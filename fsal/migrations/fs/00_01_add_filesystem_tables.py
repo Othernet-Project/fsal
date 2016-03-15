@@ -1,7 +1,7 @@
 SQL = """
 create table fsentries
 (
-    id serial primary key not null,               -- id for the file
+    id integer primary key autoincrement unique not null,               -- id for the file
     parent_id integer not null default 0,         -- id of the parent
     type integer not null,                        -- determines the type of the entry (0 => file, 1 => directory)
     name varchar not null,                        -- filename

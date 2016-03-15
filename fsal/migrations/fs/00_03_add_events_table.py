@@ -1,10 +1,10 @@
 SQL = """
 create table events
 (
-    id serial primary key not null,    -- id for event
+    id integer primary key autoincrement unique not null,    -- id for event
     type varchar not null,              -- whether it's a create, modify or delete event
     src varchar not null,               -- path of the source of event
-    is_dir bool not null             -- whether the source is a directory
+    is_dir boolean not null             -- whether the source is a directory
 );
 """
 

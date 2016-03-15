@@ -60,11 +60,11 @@ setup(
         'zippie',
         'ondd_ipc',
         'librarian_core',
-        'squery_pg',
+        'squery',
     ],
     dependency_links=[
         'git+ssh://git@github.com/Outernet-Project/librarian-core.git#egg=librarian_core-0.1',
-        'git+ssh://git@github.com/Outernet-Project/squery-pg.git#egg=squery_pg-0.1',
+        'git+ssh://git@github.com/Outernet-Project/squery.git#egg=squery-0.1',
         'git+ssh://git@github.com/Outernet-Project/ondd-ipc.git@develop#egg=ondd_ipc-0.1',
         'git+ssh://git@github.com/integricho/zippie.git#egg=zippie-0.0.1',
     ],

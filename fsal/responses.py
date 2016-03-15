@@ -11,8 +11,9 @@ file that comes with the source code, or http://www.gnu.org/licenses/gpl.txt.
 """
 
 from datetime import datetime
-
 from xml.etree.ElementTree import Element, SubElement, tostring
+
+from pytz import utc
 
 from . import commandtypes
 from .utils import to_unicode
@@ -24,6 +25,8 @@ def create_response_xml_root():
 
 
 def to_timestamp(dt, epoch=datetime(1970, 1, 1)):
+    if dt.tzinfo is not None and dt.tzinfo.utcoffset(dt) is not None:
+        epoch = epoch.replace(tzinfo=utc)
     delta = dt - epoch
     return delta.total_seconds()
 
