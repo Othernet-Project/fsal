@@ -8,14 +8,18 @@ This software is free software licensed under the terms of GPLv3. See COPYING
 file that comes with the source code, or http://www.gnu.org/licenses/gpl.txt.
 """
 
+import os
+
 from squery import Database, DatabaseContainer
 
 
-def get_databases(backend, db_name, host, port, user, password, debug=False):
+def get_databases(backend, db_name, db_path, host, port, debug=False):
+    path = os.path.abspath(os.path.join(db_path, '.'.join([db_name, 'db'])))
     databases = {db_name: Database.connect(backend,
                                            host=host,
                                            port=port,
                                            database=db_name,
+                                           path=path,
                                            debug=debug)}
     return DatabaseContainer(databases)
 
@@ -23,10 +27,9 @@ def get_databases(backend, db_name, host, port, user, password, debug=False):
 def init_databases(config):
     databases = get_databases(config['database.backend'],
                               config['database.name'],
+                              config['database.path'],
                               config['database.host'],
                               config['database.port'],
-                              config['database.user'],
-                              config['database.password'],
                               debug=False)
     # Run migrations on all databases
     for name, db in databases.items():
