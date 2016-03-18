@@ -124,7 +124,7 @@ class FSDBManager(object):
             return None
 
     def list_dir(self, path):
-        d = self._get_dir(path)
+        d = self._get_dir(path, None)
         if d is None:
             return (False, [])
         else:
@@ -179,7 +179,7 @@ class FSDBManager(object):
         fso = self._get_file(path)
         return (fso is not None)
 
-    def get_fso(self, path):
+    def get_fso(self, path, trans=None):
         valid, path = self._validate_path(path)
         if not valid:
             return None
@@ -187,7 +187,10 @@ class FSDBManager(object):
             return self.get_root_dir()
         else:
             q = self.db.Select('*', sets=self.FS_TABLE, where='path = ?')
-            result = self.db.fetchone(q, (path,))
+            if trans:
+                result = list(trans.fetch(q.serialize(), (path,)))
+            else:
+                result = self.db.fetchone(q, (path,))
             return self._construct_fso(result) if result else None
 
     def remove(self, path):
@@ -417,8 +420,12 @@ class FSDBManager(object):
         else:
             return (True, None)
 
-    def _get_dir(self, path):
-        fso = self.get_fso(path)
+    def _get_dir(self, path, trans=None):
+        if trans:
+            fso = self.get_fso(path, trans)
+        else:
+            with self.db.transaction() as trans:
+                fso = self.get_fso(path, trans)
         return fso if fso and fso.is_dir() else None
 
     def _get_file(self, path):
@@ -526,28 +533,32 @@ class FSDBManager(object):
         id_cache = FIFOCache(1024)
         try:
             checker = functools.partial(self._fnwalk_checker, base_path)
-            for entry in yielding_checked_fnwalk(src_path, checker):
-                path = entry.path
-                rel_path = os.path.relpath(path, base_path)
-                parent_path = os.path.dirname(rel_path)
-                parent_id = id_cache[parent_path] if parent_path in id_cache else None
-                if entry.is_dir():
-                    fso = Directory.from_stat(
-                        base_path, rel_path, entry.stat())
-                else:
-                    fso = File.from_stat(base_path, rel_path, entry.stat())
-                old_fso = self.get_fso(rel_path)
-                if not old_fso:
-                    event_cls = DirCreatedEvent if fso.is_dir() else FileCreatedEvent
-                elif old_fso != fso:
-                    event_cls = DirModifiedEvent if fso.is_dir() else FileModifiedEvent
-                if not old_fso or old_fso != fso:
-                    if event_cls:
-                        self.event_queue.add(event_cls(rel_path))
-                    fso_id = self._update_fso_entry(fso, parent_id, old_fso)
-                    logging.debug('Updating db entry for "%s"' % rel_path)
-                    if fso.is_dir():
-                        id_cache[fso.rel_path] = fso_id
+            with self.db.transaction() as trans:
+                list(trans.execute('BEGIN;'))
+                for entry in yielding_checked_fnwalk(src_path, checker):
+                    path = entry.path
+                    rel_path = os.path.relpath(path, base_path)
+                    parent_path = os.path.dirname(rel_path)
+                    parent_id = id_cache[parent_path] if parent_path in id_cache else None
+                    if entry.is_dir():
+                        fso = Directory.from_stat(
+                            base_path, rel_path, entry.stat())
+                    else:
+                        fso = File.from_stat(base_path, rel_path, entry.stat())
+                    old_fso = self.get_fso(rel_path, trans)
+                    if not old_fso:
+                        event_cls = DirCreatedEvent if fso.is_dir() else FileCreatedEvent
+                    elif old_fso != fso:
+                        event_cls = DirModifiedEvent if fso.is_dir() else FileModifiedEvent
+                    if not old_fso or old_fso != fso:
+                        if event_cls:
+                            pass
+                            #self.event_queue.add(event_cls(rel_path))
+                        fso_id = self._update_fso_entry(fso, parent_id, old_fso, trans)
+                        logging.debug('Updating db entry for "%s"' % rel_path)
+                        if fso.is_dir():
+                            id_cache[fso.rel_path] = fso_id
+                list(trans.execute('COMMIT;'))
         except Exception:
             logging.exception('Exception while indexing "%s"' % src_path)
 
@@ -574,10 +585,10 @@ class FSDBManager(object):
                 logging.exception(
                     'Unexpected exception while extracing bundles in {}: {}'.format(base_path, str(e)))
 
-    def _update_fso_entry(self, fso, parent_id=None, old_entry=None):
+    def _update_fso_entry(self, fso, parent_id=None, old_entry=None, trans=None):
         if not parent_id:
             parent, name = os.path.split(fso.rel_path)
-            parent_dir = self._get_dir(parent)
+            parent_dir = self._get_dir(parent, trans)
             parent_id = parent_dir.__id if parent_dir else 0
 
         vals = {
@@ -596,15 +607,15 @@ class FSDBManager(object):
             q = self.db.Update(
                 self.FS_TABLE, where='id = :id', **sql_params)
             vals['id'] = old_entry.__id
-            self.db.execute(q, vals)
+            trans.execute(q, vals)
             return old_entry.__id
         else:
             cols = ['parent_id', 'type', 'name', 'size', 'create_time',
                     'modify_time', 'path', 'base_path']
             q = self.db.Insert(self.FS_TABLE, cols=cols)
-            self.db.execute(q, vals)
+            list(trans.execute(q.serialize(), vals))
             query = self.db.Select(sets=self.FS_TABLE, where='path = :path')
-            result = self.db.fetchone(query, dict(path=vals['path']))
+            result = next(trans.fetch(query.serialize(), dict(path=vals['path'])))
             return result['id']
 
     def _clear_db(self):
