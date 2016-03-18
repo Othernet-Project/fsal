@@ -553,7 +553,7 @@ class FSDBManager(object):
                     if not old_fso or old_fso != fso:
                         if event_cls:
                             pass
-                            #self.event_queue.add(event_cls(rel_path))
+                            self.event_queue.add(event_cls(rel_path))
                         fso_id = self._update_fso_entry(fso, parent_id, old_fso, trans)
                         logging.debug('Updating db entry for "%s"' % rel_path)
                         if fso.is_dir():
