@@ -58,9 +58,9 @@ setup(
         'scandir>=0.9',
         'setuptools',
         'zippie',
-        'ondd_ipc',
-        'librarian_core',
-        'squery_pg',
+        'ondd-ipc',
+        'squery-pg',
+        'confloader>=1.0',
     ],
     dependency_links=[
         'git+ssh://git@github.com/Outernet-Project/librarian-core.git#egg=librarian_core-0.1',
