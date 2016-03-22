@@ -132,23 +132,23 @@ class FileSystemEventQueue(object):
 
     def getitems(self, maxnum=100):
         items = []
-        with self.db.transaction():
+        with self.db.transaction() as cursor:
             q = self.db.Select(what='*', sets=self.EVENTS_TABLE, limit=maxnum,
                                order='id')
-            row_iter = self.db.fetchiter(q)
+            row_iter = self.db.fetchiter(q, cursor=cursor)
             for row in row_iter:
                 items.append(event_from_row(row))
         return items
 
     def delitems(self, num):
-        with self.db.transaction():
+        with self.db.transaction() as cursor:
             ids = []
             q = self.db.Select(what='id', sets=self.EVENTS_TABLE, limit=num,
                                order='id')
-            row_iter = self.db.fetchiter(q)
+            row_iter = self.db.fetchiter(q, cursor=cursor)
             for row in row_iter:
                 ids.append(row['id'])
             q = self.db.Delete(self.EVENTS_TABLE, where='id = ?')
-            self.db.executemany(q, ((id,) for id in ids))
+            self.db.executemany(q, ((id,) for id in ids), cursor=cursor)
             if len(ids) > 0:
                 logging.debug('Cleared %d events' % len(ids))
