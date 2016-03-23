@@ -30,7 +30,7 @@ import xml.etree.ElementTree as ET
 from gevent.server import StreamServer
 
 from .xmlparser import parsestring
-from librarian_core.confloader import ConfDict
+from confloader import ConfDict
 from .handlers import CommandHandlerFactory
 from .responses import CommandResponseFactory
 from .fsdbmanager import FSDBManager
@@ -38,6 +38,10 @@ from .db.databases import init_databases, close_databases
 
 
 MODDIR = dirname(abspath(__file__))
+FSAL_DEFAULTS = {
+    'catchall': True,
+    'autojson': True
+}
 
 
 def in_pkg(*paths):
@@ -181,8 +185,7 @@ def main():
                         default=in_pkg('fsal-server.ini'))
     args, unknown = parser.parse_known_args()
 
-    config_path = args.conf
-    config = ConfDict.from_file(config_path, catchall=True, autojson=True)
+    config = ConfDict.from_file(args.conf, defaults=FSAL_DEFAULTS)
 
     configure_logging(config)
 
