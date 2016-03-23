@@ -224,6 +224,10 @@ class FSAL(object):
     def list_dir(self, path):
         return {'path': path}
 
+    @command(commandtypes.COMMAND_TYPE_LIST_DESCENDANTS, _parse_list_dir_response)
+    def list_descendants(self, path, span=None):
+        return {'path': path, 'span': span}
+
     @command(commandtypes.COMMAND_TYPE_EXISTS, _parse_exists_response)
     def exists(self, path, unindexed=False):
         return {
