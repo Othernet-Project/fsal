@@ -61,6 +61,24 @@ class DirectoryListingCommandHandler(CommandHandler):
         return self.send_result(success=success, params=params)
 
 
+class ListDescendantsCommandHandler(CommandHandler):
+    command_type = commandtypes.COMMAND_TYPE_LIST_DESCENDANTS
+
+    def do_command(self):
+        path = self.command_data.params.path.data
+        span = self.command_data.params.span.data
+        success, fs_objs = self.fs_mgr.list_descendants(path, span)
+        dirs = []
+        files = []
+        for fso in fs_objs:
+            if fso.is_dir():
+                dirs.append(fso)
+            else:
+                files.append(fso)
+        params = {'dirs': dirs, 'files': files}
+        return self.send_result(success=success, params=params)
+
+
 class SearchCommandHandler(CommandHandler):
     command_type = commandtypes.COMMAND_TYPE_SEARCH
 

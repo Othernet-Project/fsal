@@ -132,6 +132,20 @@ class FSDBManager(object):
             row_iter = self.db.fetchiter(q, (d.__id,))
             return (True, self._fso_row_iterator(row_iter))
 
+    def list_descendants(self, path, span=None):
+        d = self._get_dir(path)
+        if d is None:
+            return (False, [])
+
+        q = self.db.Select('*', sets=self.FS_TABLE)
+        if path != '.':
+            path = os.path.join(path, '%')
+            q.where += 'path LIKE %(path)s'
+        if span:
+            q.where += "create_time > NOW() - %(span)s * INTERVAL '1 days'"
+        row_iter = self.db.fetchiter(q, dict(path=path, span=span))
+        return (True, self._fso_row_iterator(row_iter))
+
     def search(self, query, whole_words=False, exclude=None):
         is_match, files = self.list_dir(query)
         if is_match:
