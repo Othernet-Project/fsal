@@ -127,13 +127,17 @@ class DirectoryListingResponse(GenericResponse):
         success_node.text = to_unicode(success).lower()
         if success:
             params_node = SubElement(result_node, u'params')
+            count = self.response_data['params'].get('count')
+            if count:
+                count_node = SubElement(result_node, u'count')
+                count_node.text = to_unicode(count)
 
             dirs_node = SubElement(params_node, u'dirs')
-            for d in self.response_data['params']['dirs']:
+            for d in self.response_data['params'].get('dirs', []):
                 add_dir_node(dirs_node, d)
 
             files_node = SubElement(params_node, u'files')
-            for f in self.response_data['params']['files']:
+            for f in self.response_data['params'].get('files', []):
                 add_file_node(files_node, f)
 
         return root
