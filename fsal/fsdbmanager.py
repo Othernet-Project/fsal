@@ -133,10 +133,11 @@ class FSDBManager(object):
             return (True, self._fso_row_iterator(row_iter))
 
     def list_descendants(self, path, count=False, offset=None, limit=None,
-                         span=None, order=None):
+                         entry_type=None, span=None, order=None):
         d = self._get_dir(path)
         if d is None:
             return (False, [])
+
         q = self.db.Select('COUNT(*) as count' if count else '*',
                            sets=self.FS_TABLE,
                            limit=limit,
@@ -147,10 +148,15 @@ class FSDBManager(object):
             q.where += 'path LIKE %(path)s'
         if span:
             q.where += "create_time > NOW() - %(span)s * INTERVAL '1 days'"
+        if entry_type:
+            q.where += "type = %(entry_type)s"
+
+        filter_args = dict(path=path, span=span, entry_type=entry_type)
         if count:
-            count = self.db.fetchone(q, dict(path=path, span=span))['count']
+            count = self.db.fetchone(q, filter_args)['count']
             return (True, count, [])
-        row_iter = self.db.fetchiter(q, dict(path=path, span=span))
+
+        row_iter = self.db.fetchiter(q, filter_args)
         return (True, None, self._fso_row_iterator(row_iter))
 
     def search(self, query, whole_words=False, exclude=None):

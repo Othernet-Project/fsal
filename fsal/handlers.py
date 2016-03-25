@@ -71,12 +71,16 @@ class ListDescendantsCommandHandler(CommandHandler):
         limit = self.command_data.params.get_data('limit', None)
         order = self.command_data.params.get_data('order', None)
         span = self.command_data.params.get_data('span', None)
-        success, count, fs_objs = self.fs_mgr.list_descendants(path,
-                                                               count=count,
-                                                               offset=offset,
-                                                               limit=limit,
-                                                               order=order,
-                                                               span=span)
+        entry_type = self.command_data.params.get_data('entry_type', None)
+        (success,
+         count,
+         fs_objs) = self.fs_mgr.list_descendants(path,
+                                                 count=count,
+                                                 offset=offset,
+                                                 limit=limit,
+                                                 order=order,
+                                                 span=span,
+                                                 entry_type=entry_type)
         dirs = []
         files = []
         for fso in fs_objs:
