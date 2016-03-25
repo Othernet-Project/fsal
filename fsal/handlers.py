@@ -66,8 +66,17 @@ class ListDescendantsCommandHandler(CommandHandler):
 
     def do_command(self):
         path = self.command_data.params.path.data
-        span = self.command_data.params.span.data
-        success, fs_objs = self.fs_mgr.list_descendants(path, span)
+        count = str_to_bool(self.command_data.params.count.data)
+        offset = self.command_data.params.get_data('offset', None)
+        limit = self.command_data.params.get_data('limit', None)
+        order = self.command_data.params.get_data('order', None)
+        span = self.command_data.params.get_data('span', None)
+        success, count, fs_objs = self.fs_mgr.list_descendants(path,
+                                                               count=count,
+                                                               offset=offset,
+                                                               limit=limit,
+                                                               order=order,
+                                                               span=span)
         dirs = []
         files = []
         for fso in fs_objs:
@@ -75,7 +84,7 @@ class ListDescendantsCommandHandler(CommandHandler):
                 dirs.append(fso)
             else:
                 files.append(fso)
-        params = {'dirs': dirs, 'files': files}
+        params = {'dirs': dirs, 'files': files, 'count': count}
         return self.send_result(success=success, params=params)
 
 

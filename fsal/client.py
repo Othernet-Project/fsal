@@ -108,6 +108,20 @@ class FSAL(object):
             sort_listing(files)
         return (success, dirs, files)
 
+    def _parse_list_descendants_response(self, response_xml):
+        success_node = response_xml.find('.//success')
+        success = str_to_bool(success_node.text)
+        dirs = []
+        files = []
+        if success:
+            count_node = response_xml.find('.//count')
+            count = int(count_node.text) if count_node is not None else None
+            dirs_node = response_xml.find('.//dirs')
+            files_node = response_xml.find('.//files')
+            dirs = list(iter_fsobjs(dirs_node, Directory.from_xml))
+            files = list(iter_fsobjs(files_node, File.from_xml))
+        return (success, count, dirs, files)
+
     def _parse_exists_response(self, response_xml):
         success_node = response_xml.find('.//success')
         success = str_to_bool(success_node.text)
@@ -224,9 +238,19 @@ class FSAL(object):
     def list_dir(self, path):
         return {'path': path}
 
-    @command(commandtypes.COMMAND_TYPE_LIST_DESCENDANTS, _parse_list_dir_response)
-    def list_descendants(self, path, span=None):
-        return {'path': path, 'span': span}
+    @command(commandtypes.COMMAND_TYPE_LIST_DESCENDANTS, _parse_list_descendants_response)
+    def list_descendants(self, path, count=False, offset=None, limit=None,
+                         order=None, span=None):
+        params = {'path': path, 'count': bool_to_str(count)}
+        if order:
+            params['order'] = order
+        if offset:
+            params['offset'] = offset
+        if limit:
+            params['limit'] = limit
+        if span:
+            params['span'] = span
+        return params
 
     @command(commandtypes.COMMAND_TYPE_EXISTS, _parse_exists_response)
     def exists(self, path, unindexed=False):
