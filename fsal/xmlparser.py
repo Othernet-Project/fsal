@@ -20,6 +20,12 @@ class Node(object):
     def add_data(self, data):
         self.data += data
 
+    def get_data(self, key, default=None):
+        try:
+            return getattr(self, key).data
+        except AttributeError:
+            return default
+
     def __getattr__(self, key):
         matching_children = [x for x in self.children if x.tag == key]
         if matching_children:
