@@ -308,14 +308,17 @@ class FSDBManager(object):
         self._refresh_db_async()
 
     def refresh_path(self, src_path=None, base_paths=None):
-        src_path = src_path or self.ROOT_DIR_PATH
-        base_paths = base_paths or self.base_paths
-        valid, src_path = self._validate_path(src_path)
-        if not valid:
-            return (False, ('No such file or directory "%s"' % src_path))
-        base_paths = [p for p in base_paths if p in self.base_paths]
-        for path in base_paths:
-            self._prune_db_async(path)
+        if src_path:
+            valid, src_path = self._validate_path(src_path)
+            if not valid:
+                return (False, ('No such file or directory "%s"' % src_path))
+        else:
+            src_path = self.ROOT_DIR_PATH
+        if self.get_fso(src_path).is_dir():
+            base_paths = base_paths or self.base_paths
+            base_paths = [p for p in base_paths if p in self.base_paths]
+            for base_path in base_paths:
+                self._prune_db_async(src_path, base_path)
         self._update_db_async(src_path, base_paths)
         return (True, None)
 
@@ -495,16 +498,21 @@ class FSDBManager(object):
         end = time.time()
         logging.debug('DB refreshed in %0.3f ms' % ((end - start) * 1000))
 
-    def _prune_db_async(self, base_path):
-        self.scheduler.schedule(self._prune_db, args=(base_path,))
+    def _prune_db_async(self, src_path, base_path):
+        self.scheduler.schedule(self._prune_db,
+                                args=(src_path, base_path,))
 
-    def _prune_db(self, base_path=None, batch_size=1000):
+    def _prune_db(self, src_path=None, base_path=None, batch_size=1000):
         q = self.db.Select('base_path, path', sets=self.FS_TABLE)
+        if src_path:
+            q.where &= 'path LIKE %(path)s'
         if base_path:
-            q.where |= 'base_path = %(base_path)s'
+            q.where &= 'base_path = %(base_path)s'
             logging.debug('Prune operation restricted to {}'.format(base_path))
         removed_paths = []
-        for result in self.db.fetchiter(q, dict(base_path=base_path)):
+        path = u'{}%'.format(src_path) if src_path else None
+        q_params = dict(base_path=base_path, path=path)
+        for result in self.db.fetchiter(q, q_params):
             path = result['path']
             base_path = result['base_path'] or ''
             full_path = os.path.join(base_path, path)
