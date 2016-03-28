@@ -498,7 +498,7 @@ class FSDBManager(object):
         end = time.time()
         logging.debug('DB refreshed in %0.3f ms' % ((end - start) * 1000))
 
-    def _prune_db_async(self, src_path, base_path):
+    def _prune_db_async(self, src_path=None, base_path=None):
         self.scheduler.schedule(self._prune_db,
                                 args=(src_path, base_path,))
 
