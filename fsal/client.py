@@ -28,6 +28,9 @@ def build_request_xml(command, params):
         param_node = SubElement(params_node, key)
         if isinstance(value, list):
             add_list_xml(value, param_node)
+        elif hasattr(value, '__iter__'):
+            # Convert iterables to list
+            add_list_xml(list(value), param_node)
         else:
             param_node.text = to_unicode(value)
     return root
