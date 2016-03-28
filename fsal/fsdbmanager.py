@@ -261,13 +261,14 @@ class FSDBManager(object):
                     asyncfs.rm(os.path.join(src, name))
             except Exception:
                 logging.exception(
-                    'Unexpected error while consolidating from {} to {}'.format(
+                    'Unexpected error in consolidating from {} to {}'.format(
                         src, dest))
             finally:
                 self._prune_db_async(src)
         self.refresh_path(base_paths=(dest,))
-        return True, 'All files from {} copied to {} successfully'.format(src,
-                                                                          dest)
+        msg = 'All files from ({}) copied to {} successfully'.format(
+            ', '.join(sources), dest)
+        return True, msg
 
     def transfer(self, src, dest):
         success, msg = self._validate_transfer(src, dest)
