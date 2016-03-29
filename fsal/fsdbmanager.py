@@ -147,7 +147,7 @@ class FSDBManager(object):
             path = os.path.join(path, '%')
             q.where += 'path LIKE %(path)s'
         if span:
-            q.where += "create_time > NOW() - %(span)s * INTERVAL '1 days'"
+            q.where += "modify_time > NOW() - %(span)s * INTERVAL '1 days'"
         if entry_type:
             q.where += "type = %(entry_type)s"
 
