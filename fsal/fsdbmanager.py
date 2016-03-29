@@ -133,7 +133,7 @@ class FSDBManager(object):
             return (True, self._fso_row_iterator(row_iter))
 
     def list_descendants(self, path, count=False, offset=None, limit=None,
-                         entry_type=None, span=None, order=None):
+                         entry_type=None, span=None, order=None, ignored_paths=None):
         d = self._get_dir(path)
         if d is None:
             return (False, [])
@@ -146,12 +146,19 @@ class FSDBManager(object):
         if path != '.':
             path = os.path.join(path, '%')
             q.where += 'path LIKE %(path)s'
+        ignored_args = {}
+        if ignored_paths:
+            for i, ignored_path in enumerate(ignored_paths):
+                key = 'ignore-{}'.format(i)
+                ignored_args[key] = ignored_path + '%'
+                q.where += 'path NOT LIKE %({})s'.format(key)
         if span:
             q.where += "modify_time > NOW() - %(span)s * INTERVAL '1 days'"
         if entry_type:
             q.where += "type = %(entry_type)s"
 
         filter_args = dict(path=path, span=span, entry_type=entry_type)
+        filter_args.update(ignored_args)
         if count:
             count = self.db.fetchone(q, filter_args)['count']
             return (True, count, [])

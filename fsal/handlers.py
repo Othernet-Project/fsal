@@ -72,6 +72,10 @@ class ListDescendantsCommandHandler(CommandHandler):
         order = self.command_data.params.get_data('order', None)
         span = self.command_data.params.get_data('span', None)
         entry_type = self.command_data.params.get_data('entry_type', None)
+        if 'ignored_paths' in self.command_data.params:
+            ignored_paths = [i.data for i in self.command_data.params.ignored_paths.children if i.data]
+        else:
+            ignored_paths = None
         (success,
          count,
          fs_objs) = self.fs_mgr.list_descendants(path,
@@ -80,7 +84,8 @@ class ListDescendantsCommandHandler(CommandHandler):
                                                  limit=limit,
                                                  order=order,
                                                  span=span,
-                                                 entry_type=entry_type)
+                                                 entry_type=entry_type,
+                                                 ignored_paths=ignored_paths)
         dirs = []
         files = []
         for fso in fs_objs:

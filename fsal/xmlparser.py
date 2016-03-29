@@ -38,6 +38,9 @@ class Node(object):
                 "'%s' has no attribute '%s'" % (self.tag, key)
             )
 
+    def __contains__(self, key):
+        return any([x for x in self.children if x.tag == key])
+
 
 class SaxHandler(ContentHandler):
 

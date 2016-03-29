@@ -243,7 +243,7 @@ class FSAL(object):
 
     @command(commandtypes.COMMAND_TYPE_LIST_DESCENDANTS, _parse_list_descendants_response)
     def list_descendants(self, path, count=False, offset=None, limit=None,
-                         order=None, span=None, entry_type=None):
+                         order=None, span=None, entry_type=None, ignored_paths=None):
         params = {'path': path, 'count': bool_to_str(count)}
         if order is not None:
             params['order'] = order
@@ -255,6 +255,8 @@ class FSAL(object):
             params['span'] = span
         if entry_type is not None:
             params['entry_type'] = entry_type
+        if ignored_paths is not None:
+            params['ignored_paths'] = ignored_paths
         return params
 
     @command(commandtypes.COMMAND_TYPE_EXISTS, _parse_exists_response)
