@@ -261,8 +261,8 @@ class FSDBManager(object):
                 for name in os.listdir(src):
                     asyncfs.rm(os.path.join(src, name))
             except Exception:
-                msg = 'Unexpected error in consolidating from {} to {}'.format(
-                        src, dest)
+                msg = 'Error while consolidating from {} to {}'.format(
+                    src, dest)
                 logging.exception(msg)
                 errors.append(msg)
         if not errors:
