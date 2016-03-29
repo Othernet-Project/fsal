@@ -333,8 +333,7 @@ class FSDBManager(object):
                 return (False, ('No such file or directory "%s"' % src_path))
         else:
             src_path = self.ROOT_DIR_PATH
-        src_obj = self.get_dir(src_path)
-        if src_obj:
+        if self.is_dir(src_path):
             base_paths = base_paths or self.base_paths
             base_paths = [p for p in base_paths if p in self.base_paths]
             for base_path in base_paths:
