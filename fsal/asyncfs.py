@@ -39,7 +39,7 @@ def copy(src, dst):
     if os.path.isdir(dst):
         dst = os.path.join(dst, os.path.basename(src))
     copyfile(src, dst)
-    copymode(src, dst)
+    copystat(src, dst)
 
 
 def copyfile(src, dst):

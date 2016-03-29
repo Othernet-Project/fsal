@@ -246,13 +246,14 @@ class FSDBManager(object):
         return success, size
 
     def consolidate(self, sources, dest):
+        errors = []
         for src in sources:
             valid, msg = self._validate_transfer(src, dest)
             if not valid:
                 return False, msg
             try:
                 src, dest = map(os.path.abspath, (src, dest))
-                logging.debug(
+                logging.info(
                     'Consolidation started from {} to {}'.format(
                         src, dest))
                 asyncfs.copytree(src, dest, merge=True)
@@ -260,15 +261,26 @@ class FSDBManager(object):
                 for name in os.listdir(src):
                     asyncfs.rm(os.path.join(src, name))
             except Exception:
-                logging.exception(
-                    'Unexpected error in consolidating from {} to {}'.format(
-                        src, dest))
-            finally:
-                self._prune_db_async(src)
-        self.refresh_path(base_paths=(dest,))
-        msg = 'All files from ({}) copied to {} successfully'.format(
-            ', '.join(sources), dest)
-        return True, msg
+                msg = 'Unexpected error in consolidating from {} to {}'.format(
+                        src, dest)
+                logging.exception(msg)
+                errors.append(msg)
+        if not errors:
+            # Update base paths of the consolidated content so that they are
+            # immediately accessible
+            self._update_base_paths(sources, dest)
+            success = True
+            msg = 'All files from ({}) copied to {} successfully'.format(
+                  ', '.join(sources), dest)
+        else:
+            success = False
+            msg = 'Errors: {}'.format('\n'.join(errors))
+
+        for src in sources:
+            self._prune_db_async(base_path=src)
+        self._update_db_async(base_paths=(dest,))
+        logging.info(msg)
+        return success, msg
 
     def transfer(self, src, dest):
         success, msg = self._validate_transfer(src, dest)
@@ -314,7 +326,8 @@ class FSDBManager(object):
                 return (False, ('No such file or directory "%s"' % src_path))
         else:
             src_path = self.ROOT_DIR_PATH
-        if self.get_fso(src_path).is_dir():
+        src_obj = self.get_dir(src_path)
+        if src_obj:
             base_paths = base_paths or self.base_paths
             base_paths = [p for p in base_paths if p in self.base_paths]
             for base_path in base_paths:
@@ -525,6 +538,15 @@ class FSDBManager(object):
         if len(removed_paths) >= 0:
             self._remove_paths(removed_paths)
 
+    def _update_base_paths(self, srcs, base_path):
+        q = self.db.Update(self.FS_TABLE,
+                           where=self.db.sqlin('base_path', srcs),
+                           base_path='%s')
+        params = []
+        params.append(base_path)
+        params.extend(srcs)
+        self.db.execute(q, params)
+
     def _remove_paths(self, paths):
         q = self.db.Delete(self.FS_TABLE, where='path = %s')
         self.db.executemany(q, ((p,) for _, p in paths))
@@ -577,11 +599,13 @@ class FSDBManager(object):
                 old_fso = self.get_fso(rel_path)
                 if not old_fso:
                     event_cls = DirCreatedEvent if fso.is_dir() else FileCreatedEvent
-                elif old_fso != fso:
+                elif old_fso.changed(fso):
                     event_cls = DirModifiedEvent if fso.is_dir() else FileModifiedEvent
+                else:
+                    event_cls = None
+                if event_cls:
+                    self.event_queue.add(event_cls(rel_path))
                 if not old_fso or old_fso != fso:
-                    if event_cls:
-                        self.event_queue.add(event_cls(rel_path))
                     fso_id = self._update_fso_entry(fso, parent_id, old_fso)
                     logging.debug('Updating db entry for "%s"' % rel_path)
                     if fso.is_dir():

@@ -54,30 +54,19 @@ class GenericResponse:
         return tostring(self.get_xml(), encoding=encoding)
 
 
-def add_dir_node(parent_node, fso):
-    dir_node = SubElement(parent_node, u'dir')
-    base_path_node = SubElement(dir_node, u'base-path')
+def add_fso_node(parent_node, fso):
+    node_name = u'dir' if fso.is_dir() else u'file'
+    fso_node = SubElement(parent_node, node_name)
+    base_path_node = SubElement(fso_node, u'base-path')
     base_path_node.text = to_unicode(fso.base_path)
-    rel_path_node = SubElement(dir_node, u'rel-path')
+    rel_path_node = SubElement(fso_node, u'rel-path')
     rel_path_node.text = to_unicode(fso.rel_path)
-    create_timestamp_node = SubElement(dir_node, u'create-timestamp')
+    create_timestamp_node = SubElement(fso_node, u'create-timestamp')
     create_timestamp_node.text = to_unicode(to_timestamp(fso.create_date))
-    modify_timestamp_node = SubElement(dir_node, u'modify-timestamp')
+    modify_timestamp_node = SubElement(fso_node, u'modify-timestamp')
     modify_timestamp_node.text = to_unicode(to_timestamp(fso.modify_date))
-
-
-def add_file_node(parent_node, fso):
-    file_node = SubElement(parent_node, u'file')
-    base_path_node = SubElement(file_node, u'base-path')
-    base_path_node.text = to_unicode(fso.base_path)
-    rel_path_node = SubElement(file_node, u'rel-path')
-    rel_path_node.text = to_unicode(fso.rel_path)
-    size_node = SubElement(file_node, u'size')
-    size_node.text = to_unicode(fso.size)
-    create_timestamp_node = SubElement(file_node, u'create-timestamp')
-    create_timestamp_node.text = to_unicode(to_timestamp(fso.create_date))
-    modify_timestamp_node = SubElement(file_node, u'modify-timestamp')
-    modify_timestamp_node.text = to_unicode(to_timestamp(fso.modify_date))
+    size_node = SubElement(fso_node, u'size')
+    size_node.text = str(fso.size)
 
 
 def add_event_node(parent_node, event):
@@ -134,11 +123,11 @@ class DirectoryListingResponse(GenericResponse):
 
             dirs_node = SubElement(params_node, u'dirs')
             for d in self.response_data['params'].get('dirs', []):
-                add_dir_node(dirs_node, d)
+                add_fso_node(dirs_node, d)
 
             files_node = SubElement(params_node, u'files')
             for f in self.response_data['params'].get('files', []):
-                add_file_node(files_node, f)
+                add_fso_node(files_node, f)
 
         return root
 
@@ -160,11 +149,11 @@ class SearchResponse(GenericResponse):
 
             dirs_node = SubElement(params_node, u'dirs')
             for d in self.response_data['params']['dirs']:
-                add_dir_node(dirs_node, d)
+                add_fso_node(dirs_node, d)
 
             files_node = SubElement(params_node, u'files')
             for f in self.response_data['params']['files']:
-                add_file_node(files_node, f)
+                add_fso_node(files_node, f)
 
         return root
 
@@ -180,10 +169,8 @@ class GetFSOResponse(GenericResponse):
         if success:
             params = self.response_data['params']
             params_node = SubElement(result_node, u'params')
-            if 'dir' in params:
-                add_dir_node(params_node, params['dir'])
-            else:
-                add_file_node(params_node, params['file'])
+            fso = params['dir'] if 'dir' in params else params['file']
+            add_fso_node(params_node, fso)
         else:
             error_node = SubElement(result_node, u'error')
             error_node.text = to_unicode(self.response_data['params']['error'])
