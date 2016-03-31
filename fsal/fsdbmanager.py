@@ -270,7 +270,7 @@ class FSDBManager(object):
                                  copied=copied)
                 # Remove contents of src but not the folder itself
                 for src_path in copied:
-                    if os.path.exists(src_path):
+                    if src_path not in sources and os.path.exists(src_path):
                         asyncfs.rm(src_path)
             except Exception:
                 msg = 'Error while consolidating from {} to {}'.format(
@@ -303,7 +303,7 @@ class FSDBManager(object):
             self._prune_db_async(base_path=src, src_path=path)
             self._update_db_async(base_paths=(dest,), src_path=path)
         logging.info(msg)
-        is_partial = errors and copied
+        is_partial = len(errors) > 0 and len(copied) > 0
         return success, is_partial, msg
 
     def transfer(self, src, dest):
