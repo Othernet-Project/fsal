@@ -73,7 +73,7 @@ def copyfile(src, dst):
             copyfileobj(fsrc, fdst)
 
 
-def copytree(src, dst, symlinks=False, ignore=None, merge=False):
+def copytree(src, dst, symlinks=False, ignore=None, merge=False, copied=None):
     """Recursively copy a directory tree using copy2().
 
     The destination directory must not already exist.
@@ -121,7 +121,7 @@ def copytree(src, dst, symlinks=False, ignore=None, merge=False):
                 linkto = os.readlink(srcname)
                 os.symlink(linkto, dstname)
             elif os.path.isdir(srcname):
-                copytree(srcname, dstname, symlinks, ignore, merge)
+                copytree(srcname, dstname, symlinks, ignore, merge, copied)
                 gevent.sleep(SLEEP_INTERVAL)
             else:
                 # Will raise a SpecialFileError for unsupported file types
@@ -132,6 +132,9 @@ def copytree(src, dst, symlinks=False, ignore=None, merge=False):
             errors.extend(err.args[0])
         except EnvironmentError as why:
             errors.append((srcname, dstname, str(why)))
+        else:
+            if copied:
+                copied.append(srcname)
     try:
         safe_copystat(src, dst)
     except OSError as why:
@@ -140,6 +143,10 @@ def copytree(src, dst, symlinks=False, ignore=None, merge=False):
             pass
         else:
             errors.append((src, dst, str(why)))
+    else:
+        if copied:
+            copied.append(src)
+
     if errors:
         raise Error(errors)
 

@@ -254,6 +254,7 @@ class FSDBManager(object):
 
     def consolidate(self, sources, dest):
         errors = []
+        copied = []
         for src in sources:
             valid, msg = self._validate_transfer(src, dest)
             if not valid:
@@ -263,19 +264,22 @@ class FSDBManager(object):
                 logging.info(
                     'Consolidation started from {} to {}'.format(
                         src, dest))
-                asyncfs.copytree(src, dest, merge=True)
+                asyncfs.copytree(src,
+                                 dest,
+                                 merge=True,
+                                 copied=copied)
                 # Remove contents of src but not the folder itself
-                for name in os.listdir(src):
-                    asyncfs.rm(os.path.join(src, name))
+                for src_path in copied:
+                    asyncfs.rm(src_path)
             except Exception:
                 msg = 'Error while consolidating from {} to {}'.format(
                     src, dest)
                 logging.exception(msg)
                 errors.append(msg)
+        # Update base paths of the successfully consolidated content so
+        # that they are immediately accessible
+        self._update_base_paths(sources, dest, for_paths=copied)
         if not errors:
-            # Update base paths of the consolidated content so that they are
-            # immediately accessible
-            self._update_base_paths(sources, dest)
             success = True
             msg = 'All files from ({}) copied to {} successfully'.format(
                   ', '.join(sources), dest)
@@ -283,9 +287,18 @@ class FSDBManager(object):
             success = False
             msg = 'Errors: {}'.format('\n'.join(errors))
 
-        for src in sources:
-            self._prune_db_async(base_path=src)
-        self._update_db_async(base_paths=(dest,))
+        for path in copied:
+            for src in sources:
+                src_path = os.path.relpath(path, src)
+                # in case of multiple source base paths, if the copied path
+                # did not originate from ``src``, the result of relpath will
+                # still contain the originap ``path``, so don't bother pruning
+                # such entries
+                if path not in src_path:
+                    self._prune_db_async(base_path=src, src_path=src_path)
+        for path in copied:
+            dest_path = os.path.relpath(path, dest)
+            self._update_db_async(base_paths=(dest,), src_path=dest_path)
         logging.info(msg)
         return success, msg
 
@@ -544,13 +557,16 @@ class FSDBManager(object):
         if len(removed_paths) >= 0:
             self._remove_paths(removed_paths)
 
-    def _update_base_paths(self, srcs, base_path):
+    def _update_base_paths(self, srcs, base_path, for_paths=None):
         q = self.db.Update(self.FS_TABLE,
                            where=self.db.sqlin('base_path', srcs),
                            base_path='%s')
         params = []
         params.append(base_path)
         params.extend(srcs)
+        if for_paths:
+            q.where += self.db.sqlin('path', for_paths)
+            params.extend(for_paths)
         self.db.execute(q, params)
 
     def _remove_paths(self, paths):
