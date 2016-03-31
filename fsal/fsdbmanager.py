@@ -270,7 +270,8 @@ class FSDBManager(object):
                                  copied=copied)
                 # Remove contents of src but not the folder itself
                 for src_path in copied:
-                    asyncfs.rm(src_path)
+                    if os.path.exists(src_path):
+                        asyncfs.rm(src_path)
             except Exception:
                 msg = 'Error while consolidating from {} to {}'.format(
                     src, dest)
@@ -278,7 +279,18 @@ class FSDBManager(object):
                 errors.append(msg)
         # Update base paths of the successfully consolidated content so
         # that they are immediately accessible
-        self._update_base_paths(sources, dest, for_paths=copied)
+        rel_copied = []
+        for path in copied:
+            for src in sources:
+                # in case of multiple source base paths, if the copied path
+                # did not originate from ``src``, the result of relpath will
+                # still contain the originap ``path``, so don't bother pruning
+                # such entries
+                relpath = os.path.relpath(path, src)
+                if path not in relpath:
+                    rel_copied.append(relpath)
+
+        self._update_base_paths(sources, dest, for_paths=rel_copied)
         if not errors:
             success = True
             msg = 'All files from ({}) copied to {} successfully'.format(
@@ -287,20 +299,12 @@ class FSDBManager(object):
             success = False
             msg = 'Errors: {}'.format('\n'.join(errors))
 
-        for path in copied:
-            for src in sources:
-                src_path = os.path.relpath(path, src)
-                # in case of multiple source base paths, if the copied path
-                # did not originate from ``src``, the result of relpath will
-                # still contain the originap ``path``, so don't bother pruning
-                # such entries
-                if path not in src_path:
-                    self._prune_db_async(base_path=src, src_path=src_path)
-        for path in copied:
-            dest_path = os.path.relpath(path, dest)
-            self._update_db_async(base_paths=(dest,), src_path=dest_path)
+        for path in rel_copied:
+            self._prune_db_async(base_path=src, src_path=path)
+            self._update_db_async(base_paths=(dest,), src_path=path)
         logging.info(msg)
-        return success, msg
+        is_partial = errors and copied
+        return success, is_partial, msg
 
     def transfer(self, src, dest):
         success, msg = self._validate_transfer(src, dest)

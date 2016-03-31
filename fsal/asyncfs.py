@@ -133,7 +133,7 @@ def copytree(src, dst, symlinks=False, ignore=None, merge=False, copied=None):
         except EnvironmentError as why:
             errors.append((srcname, dstname, str(why)))
         else:
-            if copied:
+            if copied is not None:
                 copied.append(srcname)
     try:
         safe_copystat(src, dst)
@@ -144,7 +144,7 @@ def copytree(src, dst, symlinks=False, ignore=None, merge=False, copied=None):
         else:
             errors.append((src, dst, str(why)))
     else:
-        if copied:
+        if copied is not None:
             copied.append(src)
 
     if errors:
