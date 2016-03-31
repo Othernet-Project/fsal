@@ -8,6 +8,7 @@ from __future__ import unicode_literals
 import os
 import sys
 import stat
+import errno
 
 from shutil import copystat, _samefile, _basename, _destinsrc
 from shutil import Error, WindowsError, SpecialFileError
@@ -18,7 +19,6 @@ Error = Error
 basename = _basename
 
 SLEEP_INTERVAL = 0.001
-OPERATION_NOT_PERMITTED = 1
 
 
 def safe_copystat(src, dst):
@@ -26,7 +26,7 @@ def safe_copystat(src, dst):
         copystat(src, dst)
     except OSError as exc:
         # is it copying to file systems that do not support this operation?
-        if exc.errno != OPERATION_NOT_PERMITTED:
+        if exc.errno != errno.EPERM:
             raise
 
 
