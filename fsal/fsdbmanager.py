@@ -268,15 +268,15 @@ class FSDBManager(object):
                                  dest,
                                  merge=True,
                                  copied=copied)
-                # Remove contents of src but not the folder itself
-                for src_path in copied:
-                    if src_path not in sources and os.path.exists(src_path):
-                        asyncfs.rm(src_path)
             except Exception:
                 msg = 'Error while consolidating from {} to {}'.format(
                     src, dest)
                 logging.exception(msg)
                 errors.append(msg)
+        # Remove contents of src but not the folder itself
+        for src_path in copied:
+            if src_path not in sources and os.path.exists(src_path):
+                asyncfs.rm(src_path)
         # Update base paths of the successfully consolidated content so
         # that they are immediately accessible
         rel_copied = []
