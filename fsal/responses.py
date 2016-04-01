@@ -83,13 +83,15 @@ class ConsolidateResponse(GenericResponse):
 
     def get_xml(self):
         root = create_response_xml_root()
-        data = self.response_data['success']
         result_node = SubElement(root, u'result')
-
         success_node = SubElement(result_node, u'success')
-        success_node.text = to_unicode(data[0]).lower()
+        success = self.response_data['success']
+        success_node.text = to_unicode(success).lower()
+        is_partial_node = SubElement(result_node, u'is_partial')
+        is_partial = self.response_data['params']['is_partial']
+        is_partial_node.text = to_unicode(is_partial).lower()
         msg_node = SubElement(result_node, u'message')
-        msg_node.text = data[1]
+        msg_node.text = self.response_data['params']['message']
         return root
 
 

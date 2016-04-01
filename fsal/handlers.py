@@ -128,8 +128,8 @@ class ListBasePathsCommandHandler(CommandHandler):
     command_type = commandtypes.COMMAND_TYPE_LIST_BASE_PATHS
 
     def do_command(self):
-        return self.send_result(success=True, params={'paths':
-                                                       self.fs_mgr.base_paths})
+        return self.send_result(success=True,
+                                params={'paths': self.fs_mgr.base_paths})
 
 
 class GetPathSizeCommandHandler(CommandHandler):
@@ -147,13 +147,11 @@ class ConsolidateCommandHandler(CommandHandler):
     def do_command(self):
         source_paths = [s.data for s in self.command_data.params.sources.children]
         dest_path = self.command_data.params.dest.data
-        try:
-            resp = self.fs_mgr.consolidate(source_paths, dest_path)
-        except AssertionError:
-            # this should create a dismissable notification with details about
-            # the error
-            resp = False
-        return self.send_result(success=resp)
+        (success, is_partial, msg) = self.fs_mgr.consolidate(source_paths,
+                                                             dest_path)
+        return self.send_result(success=success,
+                                params={'is_partial': is_partial,
+                                        'message': msg})
 
 
 class CopyCommandHandler(CommandHandler):

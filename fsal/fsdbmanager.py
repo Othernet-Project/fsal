@@ -254,6 +254,7 @@ class FSDBManager(object):
 
     def consolidate(self, sources, dest):
         errors = []
+        copied = []
         for src in sources:
             valid, msg = self._validate_transfer(src, dest)
             if not valid:
@@ -263,19 +264,34 @@ class FSDBManager(object):
                 logging.info(
                     'Consolidation started from {} to {}'.format(
                         src, dest))
-                asyncfs.copytree(src, dest, merge=True)
-                # Remove contents of src but not the folder itself
-                for name in os.listdir(src):
-                    asyncfs.rm(os.path.join(src, name))
+                asyncfs.copytree(src,
+                                 dest,
+                                 merge=True,
+                                 copied=copied)
             except Exception:
                 msg = 'Error while consolidating from {} to {}'.format(
                     src, dest)
                 logging.exception(msg)
                 errors.append(msg)
+        # Remove contents of src but not the folder itself
+        for src_path in copied:
+            if src_path not in sources and os.path.exists(src_path):
+                asyncfs.rm(src_path)
+        # copied contains absolute paths, convert it to relative ones
+        rel_copied = []
+        for path in copied:
+            for src in sources:
+                # in case of multiple source base paths, if the copied path
+                # did not originate from ``src``, the result of relpath will
+                # still contain the originap ``path``, so don't bother pruning
+                # such entries
+                relpath = os.path.relpath(path, src)
+                if path not in relpath:
+                    rel_copied.append(relpath)
+        # Update base paths of the successfully consolidated content so
+        # that they are immediately accessible
+        self._update_base_paths(sources, dest, for_paths=rel_copied)
         if not errors:
-            # Update base paths of the consolidated content so that they are
-            # immediately accessible
-            self._update_base_paths(sources, dest)
             success = True
             msg = 'All files from ({}) copied to {} successfully'.format(
                   ', '.join(sources), dest)
@@ -283,11 +299,13 @@ class FSDBManager(object):
             success = False
             msg = 'Errors: {}'.format('\n'.join(errors))
 
-        for src in sources:
-            self._prune_db_async(base_path=src)
-        self._update_db_async(base_paths=(dest,))
+        for path in rel_copied:
+            for src in sources:
+                self._prune_db_async(base_path=src, src_path=path)
+            self._update_db_async(base_paths=(dest,), src_path=path)
         logging.info(msg)
-        return success, msg
+        is_partial = len(errors) > 0 and len(copied) > 0
+        return success, is_partial, msg
 
     def transfer(self, src, dest):
         success, msg = self._validate_transfer(src, dest)
@@ -544,7 +562,26 @@ class FSDBManager(object):
         if len(removed_paths) >= 0:
             self._remove_paths(removed_paths)
 
-    def _update_base_paths(self, srcs, base_path):
+    def _update_base_paths(self, srcs, base_path, for_paths=None):
+        if for_paths:
+            sql = '''
+            BEGIN;
+            CREATE TEMPORARY TABLE moved_files (
+                path VARCHAR
+            ) ON COMMIT DROP;
+            INSERT INTO moved_files (path) VALUES {};
+            UPDATE fsentries SET base_path=%s
+                WHERE base_path IN {} AND
+                      path IN (SELECT path FROM moved_files);
+            COMMIT;
+            '''.format(','.join(['(%s)'] * len(for_paths)),
+                       self.db.sqlarray(srcs))
+            params = list(for_paths)
+            params.append(base_path)
+            params.extend(srcs)
+            self.db.execute(sql, params)
+            return
+        # simple update over the whole table
         q = self.db.Update(self.FS_TABLE,
                            where=self.db.sqlin('base_path', srcs),
                            base_path='%s')

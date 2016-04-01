@@ -223,9 +223,11 @@ class FSAL(object):
     def _parse_consolidate_response(self, response_xml):
         success_node = response_xml.find('.//success')
         success = str_to_bool(success_node.text)
+        is_partial_node = response_xml.find('.//is_partial')
+        is_partial = str_to_bool(is_partial_node.text)
         message_node = response_xml.find('.//message')
         message = message_node.text
-        return success, message
+        return success, is_partial, message
 
     @command(commandtypes.COMMAND_TYPE_CONSOLIDATE, _parse_consolidate_response)
     def consolidate(self, sources, destination):

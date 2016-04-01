@@ -8,8 +8,9 @@ from __future__ import unicode_literals
 import os
 import sys
 import stat
+import errno
 
-from shutil import copymode, copystat, _samefile, _basename, _destinsrc
+from shutil import copystat, _samefile, _basename, _destinsrc
 from shutil import Error, WindowsError, SpecialFileError
 
 import gevent
@@ -18,6 +19,15 @@ Error = Error
 basename = _basename
 
 SLEEP_INTERVAL = 0.001
+
+
+def safe_copystat(src, dst):
+    try:
+        copystat(src, dst)
+    except OSError as exc:
+        # is it copying to file systems that do not support this operation?
+        if exc.errno != errno.EPERM:
+            raise
 
 
 def copyfileobj(fsrc, fdst, buff_size=16*1024):
@@ -39,7 +49,7 @@ def copy(src, dst):
     if os.path.isdir(dst):
         dst = os.path.join(dst, os.path.basename(src))
     copyfile(src, dst)
-    copystat(src, dst)
+    safe_copystat(src, dst)
 
 
 def copyfile(src, dst):
@@ -63,7 +73,7 @@ def copyfile(src, dst):
             copyfileobj(fsrc, fdst)
 
 
-def copytree(src, dst, symlinks=False, ignore=None, merge=False):
+def copytree(src, dst, symlinks=False, ignore=None, merge=False, copied=None):
     """Recursively copy a directory tree using copy2().
 
     The destination directory must not already exist.
@@ -100,6 +110,11 @@ def copytree(src, dst, symlinks=False, ignore=None, merge=False):
     except os.error as e:
         if not merge:
             raise Error(e)
+        elif copied is not None:
+            copied.append(src)
+    else:
+        if copied is not None:
+            copied.append(src)
     errors = []
     for name in names:
         if name in ignored_names:
@@ -111,7 +126,7 @@ def copytree(src, dst, symlinks=False, ignore=None, merge=False):
                 linkto = os.readlink(srcname)
                 os.symlink(linkto, dstname)
             elif os.path.isdir(srcname):
-                copytree(srcname, dstname, symlinks, ignore, merge)
+                copytree(srcname, dstname, symlinks, ignore, merge, copied)
                 gevent.sleep(SLEEP_INTERVAL)
             else:
                 # Will raise a SpecialFileError for unsupported file types
@@ -120,16 +135,20 @@ def copytree(src, dst, symlinks=False, ignore=None, merge=False):
         # continue with other files
         except Error as err:
             errors.extend(err.args[0])
-        except EnvironmentError, why:
+        except EnvironmentError as why:
             errors.append((srcname, dstname, str(why)))
+        else:
+            if copied is not None:
+                copied.append(srcname)
     try:
-        copystat(src, dst)
-    except OSError, why:
+        safe_copystat(src, dst)
+    except OSError as why:
         if WindowsError is not None and isinstance(why, WindowsError):
             # Copying file access times may fail on Windows
             pass
         else:
             errors.append((src, dst, str(why)))
+
     if errors:
         raise Error(errors)
 
