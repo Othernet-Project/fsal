@@ -563,15 +563,31 @@ class FSDBManager(object):
             self._remove_paths(removed_paths)
 
     def _update_base_paths(self, srcs, base_path, for_paths=None):
+        if for_paths:
+            sql = '''
+            BEGIN;
+            CREATE TEMPORARY TABLE moved_files (
+                path VARCHAR
+            ) ON COMMIT DROP;
+            INSERT INTO moved_files (path) VALUES {};
+            UPDATE fsentries SET base_path=%s
+                WHERE base_path IN {} AND
+                      path IN (SELECT path FROM moved_files);
+            COMMIT;
+            '''.format(','.join(['(%s)'] * len(for_paths)),
+                       self.db.sqlarray(srcs))
+            params = list(for_paths)
+            params.append(base_path)
+            params.extend(srcs)
+            self.db.execute(sql, params)
+            return
+        # simple update over the whole table
         q = self.db.Update(self.FS_TABLE,
                            where=self.db.sqlin('base_path', srcs),
                            base_path='%s')
         params = []
         params.append(base_path)
         params.extend(srcs)
-        if for_paths:
-            q.where += self.db.sqlin('path', for_paths)
-            params.extend(for_paths)
         self.db.execute(q, params)
 
     def _remove_paths(self, paths):

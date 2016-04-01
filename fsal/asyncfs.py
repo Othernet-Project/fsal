@@ -110,6 +110,11 @@ def copytree(src, dst, symlinks=False, ignore=None, merge=False, copied=None):
     except os.error as e:
         if not merge:
             raise Error(e)
+        elif copied is not None:
+            copied.append(src)
+    else:
+        if copied is not None:
+            copied.append(src)
     errors = []
     for name in names:
         if name in ignored_names:
@@ -143,9 +148,6 @@ def copytree(src, dst, symlinks=False, ignore=None, merge=False, copied=None):
             pass
         else:
             errors.append((src, dst, str(why)))
-    else:
-        if copied is not None:
-            copied.append(src)
 
     if errors:
         raise Error(errors)
