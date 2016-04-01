@@ -300,7 +300,8 @@ class FSDBManager(object):
             msg = 'Errors: {}'.format('\n'.join(errors))
 
         for path in rel_copied:
-            self._prune_db_async(base_path=src, src_path=path)
+            for src in sources:
+                self._prune_db_async(base_path=src, src_path=path)
             self._update_db_async(base_paths=(dest,), src_path=path)
         logging.info(msg)
         is_partial = len(errors) > 0 and len(copied) > 0
