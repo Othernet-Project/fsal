@@ -277,8 +277,7 @@ class FSDBManager(object):
         for src_path in copied:
             if src_path not in sources and os.path.exists(src_path):
                 asyncfs.rm(src_path)
-        # Update base paths of the successfully consolidated content so
-        # that they are immediately accessible
+        # copied contains absolute paths, convert it to relative ones
         rel_copied = []
         for path in copied:
             for src in sources:
@@ -289,7 +288,8 @@ class FSDBManager(object):
                 relpath = os.path.relpath(path, src)
                 if path not in relpath:
                     rel_copied.append(relpath)
-
+        # Update base paths of the successfully consolidated content so
+        # that they are immediately accessible
         self._update_base_paths(sources, dest, for_paths=rel_copied)
         if not errors:
             success = True
