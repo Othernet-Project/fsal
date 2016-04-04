@@ -60,6 +60,7 @@ setup(
         'zippie',
         'ondd-ipc',
         'squery-pg',
+        'greentasks>=1.0',
         'confloader>=1.0',
     ],
     dependency_links=[
