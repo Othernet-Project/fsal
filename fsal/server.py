@@ -17,6 +17,7 @@ monkey.patch_all(thread=False, aggressive=True)
 
 import os
 import sys
+import stat
 import socket
 import signal
 import logging
@@ -103,6 +104,13 @@ class FSALServer(object):
                 raise
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.bind(path)
+        try:
+            os.chmod(path, stat.S_IRWXU | stat.S_IRWXG)
+        except OSError:
+            logging.exception(
+                'Error while setting file permissions for socket {}'.format(
+                    path))
+            raise
         sock.listen(1)
         return sock
 
