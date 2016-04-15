@@ -394,7 +394,6 @@ class FSDBManager(object):
             try:
                 abspath = abs_bundle_path(base_path, path)
                 os.remove(abspath)
-                os.remove(abspath)
             except OSError as e:
                 logging.exception(
                     'Exception while removing bundle after extraction: {}'.format(str(e)))
