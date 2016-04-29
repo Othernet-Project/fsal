@@ -136,7 +136,7 @@ class FSDBManager(object):
                          entry_type=None, span=None, order=None, ignored_paths=None):
         d = self._get_dir(path)
         if d is None:
-            return (False, [])
+            return (False, None, [])
 
         q = self.db.Select('COUNT(*) as count' if count else '*',
                            sets=self.FS_TABLE,
