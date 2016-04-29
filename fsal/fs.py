@@ -28,6 +28,10 @@ class FSObject(object):
         return self._base_path
 
     @property
+    def parent(self):
+        return os.path.dirname(self._path)
+
+    @property
     def name(self):
         return self._name
 

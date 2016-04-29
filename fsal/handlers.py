@@ -97,6 +97,23 @@ class ListDescendantsCommandHandler(CommandHandler):
         return self.send_result(success=success, params=params)
 
 
+class FilterCommandHandler(CommandHandler):
+    command_type = commandtypes.COMMAND_TYPE_FILTER
+
+    def do_command(self):
+        paths = [i.data for i in self.command_data.params.paths.children]
+        success, fs_objs = self.fs_mgr.filter(paths)
+        dirs = []
+        files = []
+        for fso in fs_objs:
+            if fso.is_dir():
+                dirs.append(fso)
+            else:
+                files.append(fso)
+        params = {'dirs': dirs, 'files': files}
+        return self.send_result(success=success, params=params)
+
+
 class SearchCommandHandler(CommandHandler):
     command_type = commandtypes.COMMAND_TYPE_SEARCH
 

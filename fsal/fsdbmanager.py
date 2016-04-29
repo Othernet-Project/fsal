@@ -6,7 +6,7 @@ import logging
 import time
 import collections
 import functools
-from itertools import ifilter
+from itertools import chain, ifilter
 
 import gevent.queue
 import scandir
@@ -136,7 +136,7 @@ class FSDBManager(object):
                          entry_type=None, span=None, order=None, ignored_paths=None):
         d = self._get_dir(path)
         if d is None:
-            return (False, [])
+            return (False, None, [])
 
         q = self.db.Select('COUNT(*) as count' if count else '*',
                            sets=self.FS_TABLE,
@@ -165,6 +165,22 @@ class FSDBManager(object):
 
         row_iter = self.db.fetchiter(q, filter_args)
         return (True, None, self._fso_row_iterator(row_iter))
+
+    def filter(self, paths, batch_size=999):
+        """
+        Return a tuple of (success, iterator), where iterator yields rows
+        which ``path`` is in the passed in ``paths`` list.
+        """
+        iterators = []
+        # split list into evenly sized (``batch_size``) chunks
+        batches = (paths[i:i + batch_size]
+                   for i in range(0, len(paths), batch_size))
+        # collect iterators together instead of fetching the data right here
+        for batch in batches:
+            q = self.db.Select(sets=self.FS_TABLE,
+                               where=self.db.sqlin('path', batch))
+            iterators.append(self.db.fetchiter(q, batch))
+        return (True, self._fso_row_iterator(chain(*iterators)))
 
     def search(self, query, whole_words=False, exclude=None):
         is_match, files = self.list_dir(query)
