@@ -288,6 +288,10 @@ class FSAL(object):
 
     @command(commandtypes.COMMAND_TYPE_FILTER, _parse_list_dir_response)
     def filter(self, paths):
+        """
+        Return a subset of all file system objects from the database which
+        paths can be found in the passed in list.
+        """
         return {'paths': paths}
 
     @command(commandtypes.COMMAND_TYPE_GET_FSO, _parse_get_fso_response)

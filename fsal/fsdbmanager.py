@@ -167,9 +167,15 @@ class FSDBManager(object):
         return (True, None, self._fso_row_iterator(row_iter))
 
     def filter(self, paths, batch_size=999):
+        """
+        Return a tuple of (success, iterator), where iterator yields rows
+        which ``path`` is in the passed in ``paths`` list.
+        """
         iterators = []
+        # split list into evenly sized (``batch_size``) chunks
         batches = (paths[i:i + batch_size]
                    for i in range(0, len(paths), batch_size))
+        # collect iterators together instead of fetching the data right here
         for batch in batches:
             q = self.db.Select(sets=self.FS_TABLE,
                                where=self.db.sqlin('path', batch))
