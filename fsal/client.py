@@ -286,6 +286,10 @@ class FSAL(object):
                 'whole_words': bool_to_str(whole_words),
                 'excludes': exclude}
 
+    @command(commandtypes.COMMAND_TYPE_FILTER, _parse_list_dir_response)
+    def filter(self, paths):
+        return {'paths': paths}
+
     @command(commandtypes.COMMAND_TYPE_GET_FSO, _parse_get_fso_response)
     def get_fso(self, path):
         return {'path': path}

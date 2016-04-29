@@ -197,6 +197,7 @@ class CommandResponseFactory:
         commandtypes.COMMAND_TYPE_CONSOLIDATE: ConsolidateResponse,
         commandtypes.COMMAND_TYPE_LIST_DIR: DirectoryListingResponse,
         commandtypes.COMMAND_TYPE_LIST_DESCENDANTS: DirectoryListingResponse,
+        commandtypes.COMMAND_TYPE_FILTER: DirectoryListingResponse,
         commandtypes.COMMAND_TYPE_SEARCH: SearchResponse,
         commandtypes.COMMAND_TYPE_GET_FSO: GetFSOResponse,
         commandtypes.COMMAND_TYPE_GET_CHANGES: GetChangesResponse,
