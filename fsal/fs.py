@@ -29,7 +29,10 @@ class FSObject(object):
 
     @property
     def parent(self):
-        return os.path.dirname(self._path)
+        """
+        Return relative path of parent directory.
+        """
+        return os.path.dirname(self.rel_path)
 
     @property
     def name(self):
