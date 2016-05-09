@@ -338,3 +338,7 @@ class FSAL(object):
     @command(commandtypes.COMMAND_TYPE_REFRESH, _parse_empty_response)
     def refresh(self):
         return {}
+
+    @command(commandtypes.COMMAND_TYPE_SET_WHITELIST, _parse_empty_response)
+    def set_whitelist(self, paths):
+        return {'paths': paths}

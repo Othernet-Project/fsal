@@ -92,6 +92,9 @@ class FSDBManager(object):
         blacklist.append(self.bundle_ext.bundles_dir)
         self.blacklist = blacklist
 
+        # initially, whitelist is empty, thus everything is allowed
+        self.whitelist = []
+
         self.notification_listener = ONDDNotificationListener(
             config, self._handle_notifications)
         self.event_queue = FileSystemEventQueue(config, context)
@@ -106,6 +109,12 @@ class FSDBManager(object):
         self.__blacklist = [pattern for pattern in set(blacklist) if pattern]
         self.__blacklist_rx = [re.compile(
             pattern, re.IGNORECASE) for pattern in self.__blacklist]
+
+    def set_whitelist(self, paths):
+        """
+        Set the passed in ``paths`` as the current whitelisted paths.
+        """
+        self.whitelist = [os.path.normpath(path) for path in paths]
 
     def start(self):
         self.notification_listener.start()
@@ -429,6 +438,7 @@ class FSDBManager(object):
             full_path = os.path.abspath(os.path.join(base_path, path))
             valid = full_path.startswith(base_path)
             path = os.path.relpath(full_path, base_path)
+            valid = valid and self._is_whitelisted(path)
         return (valid, path)
 
     def _validate_external_path(self, path):
@@ -455,6 +465,17 @@ class FSDBManager(object):
     def _is_blacklisted(self, path):
         # match() is used to ensure matches start from beginning of the path
         return any((p.match(path) for p in self.__blacklist_rx))
+
+    def _is_whitelisted(self, path):
+        """
+        Return ``True`` is a whitelist was not specified, or in case it was, if
+        the path is under one of the paths present in the whitelisted paths.
+        """
+        # the startswith check makes sure that files named similarly as the
+        # folders won't be matched. e.g. Path/Filenames/ with Path/Filename
+        return (not self.whitelist or
+                any(path.startswith(base + '/') or path == base
+                    for base in self.whitelist))
 
     def _construct_fso(self, row):
         type = row['type']
@@ -733,7 +754,8 @@ class FSDBManager(object):
 
     def _fso_row_iterator(self, cursor):
         for result in cursor:
-            yield self._construct_fso(result)
+            if self._is_whitelisted(result['path']):
+                yield self._construct_fso(result)
 
 
 class FIFOCache(object):
