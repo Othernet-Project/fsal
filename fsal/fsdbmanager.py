@@ -79,17 +79,12 @@ class FSDBManager(object):
             logging.debug(u'chroot to: %s', chroot)
         # concatenate all specified ``basepaths`` with ``chroot`` and use them
         # as actual base paths
-        paths = [os.path.join(path, chroot)
-                 for path in config['fsal.basepaths']]
-        base_paths = map(os.path.abspath, filter(os.path.isdir, paths))
-        if not base_paths:
-            msg = 'No valid path found in basepaths: {}'.format(
-                ', '.join(paths))
-            raise RuntimeError(msg)
+        self.base_paths = [os.path.abspath(os.path.join(path, chroot))
+                           for path in config['fsal.basepaths']]
+        if not self.base_paths:
+            raise RuntimeError('No base paths specified.')
 
-        self.base_paths = base_paths
-        logging.debug('Using basepaths: {}'.format(', '.join(base_paths)))
-
+        logging.debug(u'Using basepaths: %s', ', '.join(self.base_paths))
         self.db = context['databases'].fs
         self.bundles_dir = config['bundles.bundles_dir']
         self.bundle_ext = BundleExtracter(config)
