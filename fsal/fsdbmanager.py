@@ -74,7 +74,13 @@ class FSDBManager(object):
     SLEEP_INTERVAL = 0.500
 
     def __init__(self, config, context):
-        paths = config['fsal.basepaths']
+        chroot = config.get('fsal.chroot') or ''
+        if chroot:
+            logging.debug(u'chroot to: %s', chroot)
+        # concatenate all specified ``basepaths`` with ``chroot`` and use them
+        # as actual base paths
+        paths = [os.path.join(path, chroot)
+                 for path in config['fsal.basepaths']]
         base_paths = map(os.path.abspath, filter(os.path.isdir, paths))
         if not base_paths:
             msg = 'No valid path found in basepaths: {}'.format(
@@ -83,6 +89,7 @@ class FSDBManager(object):
 
         self.base_paths = base_paths
         logging.debug('Using basepaths: {}'.format(', '.join(base_paths)))
+
         self.db = context['databases'].fs
         self.bundles_dir = config['bundles.bundles_dir']
         self.bundle_ext = BundleExtracter(config)
