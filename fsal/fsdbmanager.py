@@ -76,7 +76,7 @@ class FSDBManager(object):
     def __init__(self, config, context):
         chroot = config.get('fsal.chroot') or ''
         if chroot:
-            logging.debug(u'chroot to: %s', chroot)
+            logging.debug(u'Use chroot: %s', chroot)
         # concatenate all specified ``basepaths`` with ``chroot`` and use them
         # as actual base paths
         self.base_paths = [os.path.abspath(os.path.join(path, chroot))
