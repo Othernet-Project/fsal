@@ -147,31 +147,43 @@ class FSDBManager(object):
         if d is None:
             return (False, None, [])
 
+        filter_args = dict()
         q = self.db.Select('COUNT(*) as count' if count else '*',
                            sets=self.FS_TABLE,
                            limit=limit,
                            offset=offset,
                            order=order)
+        if self.whitelist:
+            # generate unique keys for each whitelisted item
+            keys = ['whitelist-{}'.format(i)
+                    for i in range(len(self.whitelist))]
+            # prepare comma separated placeholders from ``keys``
+            in_array = ', '.join('%({})s'.format(k) for k in keys)
+            q.where += ('(path SIMILAR TO %(wl_patterns)s OR'
+                        ' path IN ({}))'.format(in_array))
+            # create like pattern for the similar to operator
+            wl_patterns = '({})%'.format('|'.join(base + '/'
+                                                  for base in self.whitelist))
+            filter_args.update(wl_patterns=wl_patterns,
+                               **dict(zip(keys, self.whitelist)))
         if path != '.':
-            path = os.path.join(path, '%')
             q.where += 'path LIKE %(path)s'
-        ignored_args = {}
+            filter_args.update(path=os.path.join(path, '%'))
         if ignored_paths:
             for i, ignored_path in enumerate(ignored_paths):
                 key = 'ignore-{}'.format(i)
-                ignored_args[key] = ignored_path + '%'
                 q.where += 'path NOT LIKE %({})s'.format(key)
+                filter_args[key] = ignored_path + '%'
         if span:
             q.where += "modify_time > NOW() - %(span)s * INTERVAL '1 days'"
+            filter_args.update(span=span)
         if entry_type:
             q.where += "type = %(entry_type)s"
+            filter_args.update(entry_type=entry_type)
 
-        filter_args = dict(path=path, span=span, entry_type=entry_type)
-        filter_args.update(ignored_args)
         if count:
             count = self.db.fetchone(q, filter_args)['count']
             return (True, count, [])
-
         row_iter = self.db.fetchiter(q, filter_args)
         return (True, None, self._fso_row_iterator(row_iter))
 
