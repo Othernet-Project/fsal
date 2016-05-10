@@ -308,6 +308,15 @@ class RefreshCommandHandler(CommandHandler):
         return self.send_result(success=True, params={})
 
 
+class SetWhitelistCommandHandler(CommandHandler):
+    command_type = commandtypes.COMMAND_TYPE_SET_WHITELIST
+
+    def do_command(self):
+        paths = [i.data for i in self.command_data.params.paths.children]
+        self.fs_mgr.set_whitelist(paths)
+        return self.send_result(success=True, params={})
+
+
 class CommandHandlerFactory(object):
 
     def __init__(self, context):

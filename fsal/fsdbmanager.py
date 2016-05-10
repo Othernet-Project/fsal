@@ -94,6 +94,9 @@ class FSDBManager(object):
         blacklist.append(self.bundle_ext.bundles_dir)
         self.blacklist = blacklist
 
+        # initially, whitelist is empty, thus everything is allowed
+        self.whitelist = []
+
         self.notification_listener = ONDDNotificationListener(
             config, self._handle_notifications)
         self.event_queue = FileSystemEventQueue(config, context)
@@ -108,6 +111,12 @@ class FSDBManager(object):
         self.__blacklist = [pattern for pattern in set(blacklist) if pattern]
         self.__blacklist_rx = [re.compile(
             pattern, re.IGNORECASE) for pattern in self.__blacklist]
+
+    def set_whitelist(self, paths):
+        """
+        Set the passed in ``paths`` as the current whitelisted paths.
+        """
+        self.whitelist = [os.path.normpath(path) for path in paths]
 
     def start(self):
         self.notification_listener.start()
@@ -140,31 +149,43 @@ class FSDBManager(object):
         if d is None:
             return (False, None, [])
 
+        filter_args = dict()
         q = self.db.Select('COUNT(*) as count' if count else '*',
                            sets=self.FS_TABLE,
                            limit=limit,
                            offset=offset,
                            order=order)
+        if self.whitelist:
+            # generate unique keys for each whitelisted item
+            keys = ['whitelist-{}'.format(i)
+                    for i in range(len(self.whitelist))]
+            # prepare comma separated placeholders from ``keys``
+            in_array = ', '.join('%({})s'.format(k) for k in keys)
+            q.where += ('(path SIMILAR TO %(wl_patterns)s OR'
+                        ' path IN ({}))'.format(in_array))
+            # create like pattern for the similar to operator
+            wl_patterns = '({})%'.format('|'.join(base + '/'
+                                                  for base in self.whitelist))
+            filter_args.update(wl_patterns=wl_patterns,
+                               **dict(zip(keys, self.whitelist)))
         if path != '.':
-            path = os.path.join(path, '%')
             q.where += 'path LIKE %(path)s'
-        ignored_args = {}
+            filter_args.update(path=os.path.join(path, '%'))
         if ignored_paths:
             for i, ignored_path in enumerate(ignored_paths):
                 key = 'ignore-{}'.format(i)
-                ignored_args[key] = ignored_path + '%'
                 q.where += 'path NOT LIKE %({})s'.format(key)
+                filter_args[key] = ignored_path + '%'
         if span:
             q.where += "modify_time > NOW() - %(span)s * INTERVAL '1 days'"
+            filter_args.update(span=span)
         if entry_type:
             q.where += "type = %(entry_type)s"
+            filter_args.update(entry_type=entry_type)
 
-        filter_args = dict(path=path, span=span, entry_type=entry_type)
-        filter_args.update(ignored_args)
         if count:
             count = self.db.fetchone(q, filter_args)['count']
             return (True, count, [])
-
         row_iter = self.db.fetchiter(q, filter_args)
         return (True, None, self._fso_row_iterator(row_iter))
 
@@ -431,6 +452,7 @@ class FSDBManager(object):
             full_path = os.path.abspath(os.path.join(base_path, path))
             valid = full_path.startswith(base_path)
             path = os.path.relpath(full_path, base_path)
+            valid = valid and self._is_whitelisted(path)
         return (valid, path)
 
     def _validate_external_path(self, path):
@@ -457,6 +479,17 @@ class FSDBManager(object):
     def _is_blacklisted(self, path):
         # match() is used to ensure matches start from beginning of the path
         return any((p.match(path) for p in self.__blacklist_rx))
+
+    def _is_whitelisted(self, path):
+        """
+        Return ``True`` is a whitelist was not specified, or in case it was, if
+        the path is under one of the paths present in the whitelisted paths.
+        """
+        # the startswith check makes sure that files named similarly as the
+        # folders won't be matched. e.g. Path/Filenames/ with Path/Filename
+        return (not self.whitelist or
+                any(path.startswith(base + '/') or path == base
+                    for base in self.whitelist))
 
     def _construct_fso(self, row):
         type = row['type']
@@ -735,7 +768,8 @@ class FSDBManager(object):
 
     def _fso_row_iterator(self, cursor):
         for result in cursor:
-            yield self._construct_fso(result)
+            if self._is_whitelisted(result['path']):
+                yield self._construct_fso(result)
 
 
 class FIFOCache(object):
