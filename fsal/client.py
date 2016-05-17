@@ -116,6 +116,7 @@ class FSAL(object):
         success = str_to_bool(success_node.text)
         dirs = []
         files = []
+        count = 0
         if success:
             count_node = response_xml.find('.//count')
             count = int(count_node.text) if count_node is not None else None
