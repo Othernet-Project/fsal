@@ -32,7 +32,7 @@ def init_databases(config):
     # Run migrations on all databases
     for name, db in databases.items():
         migration_pkg = 'fsal.migrations.{0}'.format(name)
-        migrate(db, migration_pkg, config)
+        migrate(db, name, migration_pkg, config)
 
     return databases
 
