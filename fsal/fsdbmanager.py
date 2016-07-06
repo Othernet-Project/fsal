@@ -83,7 +83,10 @@ class FSDBManager(object):
                            for path in config['fsal.basepaths']]
         if not self.base_paths:
             raise RuntimeError('No base paths specified.')
-
+        # make sure base paths exist
+        for path in self.base_paths:
+            if not os.path.exists(path):
+                os.makedirs(path)
         logging.debug(u'Using basepaths: %s', ', '.join(self.base_paths))
         self.db = context['databases'].fs
         self.bundles_dir = config['bundles.bundles_dir']
