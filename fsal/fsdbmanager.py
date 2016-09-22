@@ -398,7 +398,15 @@ class FSDBManager(object):
             base_paths = [p for p in base_paths if p in self.base_paths]
             for base_path in base_paths:
                 self._prune_db_async(src_path, base_path)
-        self._update_db_async(src_path, base_paths)
+
+        if not any(os.path.exists(os.path.abspath(os.path.join(base_path,
+                                                               src_path)))
+                   for base_path in base_paths or self.base_paths):
+            # pass relative `src_path` to remove. this case is possible when
+            # refresh was forced on a freshly deleted path
+            self.remove(src_path)
+        else:
+            self._update_db_async(src_path, base_paths)
         return (True, None)
 
     def _handle_notifications(self, notifications):
